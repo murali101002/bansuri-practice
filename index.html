@@ -1,0 +1,1696 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<meta name="color-scheme" content="dark">
+<meta name="theme-color" content="#0a0e13">
+<title>Bansuri Practice — C flute helper</title>
+<style>
+:root{
+  --bg:#0a0e13; --card:#141b24; --card2:#0f151d; --line:#2b3644; --text:#eef4fb; --dim:#9db0c3;
+  --green:#3ee089; --yellow:#ffd75e; --red:#ff7a7a; --accent:#8ecbff;
+  color-scheme:dark;
+}
+*{box-sizing:border-box; -webkit-tap-highlight-color:transparent}
+html,body{margin:0;padding:0}
+body{
+  background:var(--bg); color:var(--text);
+  font-family:system-ui,-apple-system,"Segoe UI",Roboto,"Helvetica Neue",sans-serif;
+  font-size:17px; line-height:1.45; touch-action:manipulation;
+}
+button{font-family:inherit}
+header{
+  position:sticky; top:0; z-index:20;
+  background:linear-gradient(#121923,#0d1218); border-bottom:1px solid var(--line);
+  padding:8px 10px 8px; padding-top:max(8px, env(safe-area-inset-top));
+  display:flex; flex-direction:column; gap:8px;
+}
+.row-a{display:flex; align-items:center; gap:10px}
+.brand{font-weight:800; font-size:19px; flex:1; white-space:nowrap; overflow:hidden}
+.row-b{display:flex; gap:8px; align-items:stretch}
+.row-c{display:flex; gap:8px; align-items:center}
+main{padding:12px 12px calc(96px + env(safe-area-inset-bottom)); max-width:640px; margin:0 auto}
+h2{font-size:21px; margin:6px 0 10px}
+.dim{color:var(--dim)}
+.small{font-size:13.5px}
+
+/* ---------- buttons ---------- */
+.btn{
+  min-height:48px; min-width:48px; padding:10px 16px; border-radius:14px;
+  border:1px solid var(--line); background:#1a2230; color:var(--text);
+  font-size:17px; font-weight:700; cursor:pointer;
+}
+.btn:active{transform:scale(.98)}
+.btn-primary{background:var(--accent); color:#07202f; border-color:transparent}
+.btn-on{background:var(--green); color:#04220f; border-color:transparent}
+.btn-ghost{background:transparent}
+.btn[disabled]{opacity:.45}
+.chip{
+  min-height:48px; padding:8px 14px; border-radius:999px;
+  border:1px solid var(--line); background:#161d27; color:var(--text);
+  font-size:16px; font-weight:600; cursor:pointer;
+}
+.chip.active{background:var(--accent); color:#07202f; border-color:transparent}
+.chip.lit{background:var(--green); color:#04220f; border-color:transparent}
+.chip-row{display:flex; flex-wrap:wrap; gap:8px; margin-bottom:10px; align-items:center}
+.octave-label{font-size:14px}
+.sel{
+  min-height:48px; padding:8px 12px; border-radius:12px; border:1px solid var(--line);
+  background:#1a2230; color:var(--text); font-size:16px; font-weight:600; flex:1;
+}
+input[type="range"]{min-height:48px; accent-color:var(--accent); flex:1; min-width:100px}
+
+/* ---------- tabs ---------- */
+nav#tabs{
+  position:fixed; bottom:0; left:0; right:0; display:flex; z-index:30;
+  background:#0d1218; border-top:1px solid var(--line);
+  padding-bottom:env(safe-area-inset-bottom);
+}
+nav#tabs button{
+  flex:1; min-height:64px; background:none; border:none; color:var(--dim);
+  font-size:13px; font-weight:700; display:flex; flex-direction:column; gap:3px;
+  align-items:center; justify-content:center; cursor:pointer;
+}
+nav#tabs button .ticon{font-size:22px; line-height:1}
+nav#tabs button.active{color:var(--accent)}
+
+/* ---------- cards ---------- */
+.card{background:var(--card); border:1px solid var(--line); border-radius:16px; padding:14px; margin-bottom:12px}
+.tip{background:var(--card2); border:1px dashed var(--line); border-radius:12px; padding:10px 12px; font-size:14.5px; color:var(--dim); margin-bottom:10px}
+
+/* ---------- tuner ---------- */
+.swar-big{
+  font-size:clamp(72px, 24vw, 130px); font-weight:800; line-height:1.05;
+  text-align:center; letter-spacing:-1px; min-height:1.1em;
+}
+.z-green{color:var(--green)} .z-yellow{color:var(--yellow)} .z-red{color:var(--red)}
+.swar-sub{text-align:center; font-size:22px; font-weight:700; margin-top:2px}
+.tune-word{text-align:center; font-size:20px; font-weight:800; min-height:1.4em; margin-top:2px}
+.cents-wrap{margin-top:12px}
+.cents-meter{
+  position:relative; height:28px; border-radius:9px; overflow:hidden; border:1px solid var(--line);
+  background:linear-gradient(90deg,
+    rgba(255,122,122,.45) 0 15%, rgba(255,215,94,.45) 15% 35%,
+    rgba(62,224,137,.5) 35% 65%, rgba(255,215,94,.45) 65% 85%,
+    rgba(255,122,122,.45) 85% 100%);
+}
+.cents-needle{position:absolute; top:-2px; bottom:-2px; width:5px; background:#fff; box-shadow:0 0 0 1px #000; transform:translateX(-50%); left:50%}
+.cents-center{position:absolute; left:50%; top:0; bottom:0; width:2px; background:rgba(255,255,255,.45); transform:translateX(-50%)}
+.cents-labels{display:flex; justify-content:space-between; font-size:12px; color:var(--dim); margin-top:3px}
+.freq-line{text-align:center; font-size:15px; color:var(--dim); margin-top:8px; font-variant-numeric:tabular-nums}
+.stab-row{display:flex; align-items:center; gap:8px; margin-top:10px; font-size:14px; color:var(--dim)}
+.stab-bar{flex:1; height:12px; border-radius:6px; background:#1a2230; border:1px solid var(--line); overflow:hidden}
+.stab-bar>div{height:100%; width:0%; background:var(--accent)}
+.hint{
+  margin-top:10px; background:#18202b; border:1px solid var(--line); border-radius:12px;
+  padding:10px 12px; font-size:16px; min-height:20px;
+}
+.vol-row{display:flex; align-items:center; gap:8px; font-size:14px; color:var(--dim); margin-bottom:8px}
+.vol-bar{flex:1; height:14px; border-radius:7px; background:#1a2230; border:1px solid var(--line); overflow:hidden}
+.vol-bar>div{height:100%; width:0%; background:#5b8fb9}
+#pitchGraph{width:100%; height:170px; display:block; border-radius:10px; background:var(--card2); border:1px solid var(--line)}
+
+/* ---------- holes / flute diagram ---------- */
+.hole{
+  display:inline-block; width:22px; height:22px; border-radius:50%;
+  border:2.5px solid var(--dim); background:transparent; flex:none;
+}
+.hole.small{width:15px; height:15px; border-width:2px}
+.hole.big{width:34px; height:34px; border-width:3px}
+.hole.closed{background:var(--text)}
+.hole.half{background:linear-gradient(to top, var(--text) 0 50%, transparent 50%)}
+.hole.quarter{background:linear-gradient(to top, var(--text) 0 30%, transparent 30%)}
+.hole.hl-red{border-color:var(--red); box-shadow:0 0 0 3px rgba(255,122,122,.28)}
+.hole.demo{width:18px; height:18px; vertical-align:middle; margin-right:4px}
+.legend-row{display:flex; gap:16px; font-size:13.5px; color:var(--dim); margin-bottom:10px; flex-wrap:wrap}
+.flute-tube{
+  display:flex; align-items:center; gap:7px; justify-content:center;
+  background:linear-gradient(#2a3340,#1c2430); border:1px solid var(--line);
+  border-radius:16px; padding:12px 10px; margin:10px 0;
+}
+.blow-hole{width:13px; height:22px; border-radius:50%; border:2px solid var(--dim); margin-right:10px; flex:none}
+.blow-label{font-size:11px; color:var(--dim); text-align:center}
+.hole-wrap{display:flex; flex-direction:column; align-items:center; gap:4px}
+.hole-num{font-size:11px; color:var(--dim); font-weight:700}
+.hole-num.red{color:var(--red)}
+
+/* ---------- learn list ---------- */
+.swar-row{
+  display:flex; align-items:center; gap:10px; width:100%; text-align:left;
+  background:var(--card); border:1px solid var(--line); border-radius:14px;
+  padding:10px; margin-bottom:8px; color:var(--text); cursor:pointer; flex-wrap:wrap;
+}
+.swar-row.pa-row{border-color:var(--red)}
+.sr-left{flex:1; min-width:110px}
+.sr-name{font-size:20px; font-weight:800; display:block}
+.sr-west{color:var(--dim); font-size:14px}
+.sr-holes{display:flex; gap:5px; align-items:center}
+.sr-right{display:flex; align-items:center}
+.icon-btn{
+  min-width:48px; min-height:48px; border-radius:12px; border:1px solid var(--line);
+  background:#1a2230; color:var(--text); font-size:20px; cursor:pointer;
+}
+.pa-warn{
+  width:100%; background:rgba(255,122,122,.1); border:1px solid var(--red);
+  border-radius:10px; padding:8px 10px; font-size:14.5px; font-weight:600; color:var(--red);
+}
+
+/* ---------- practice ---------- */
+.mode-btn{
+  display:block; width:100%; text-align:left; min-height:80px; padding:14px;
+  border-radius:16px; border:1px solid var(--line); background:var(--card);
+  color:var(--text); margin-bottom:10px; font-size:19px; font-weight:800; cursor:pointer;
+}
+.mode-btn span{display:block; font-size:14px; font-weight:500; color:var(--dim); margin-top:4px}
+.run-top{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+.mode-title{font-size:19px; font-weight:800}
+.target-card{text-align:center}
+.target-label{font-size:14px; color:var(--dim); font-weight:700; letter-spacing:1px}
+.target-big{font-size:clamp(72px, 20vw, 110px); font-weight:800; line-height:1.1; min-height:1.1em}
+.target-note{font-size:18px; color:var(--dim); font-weight:700}
+.hold-goal{font-size:14px; color:var(--dim); margin-top:6px}
+.hold-line{font-size:22px; font-weight:800; margin-top:10px; font-variant-numeric:tabular-nums}
+.hold-line b{font-size:30px}
+.best-line{font-size:14px; color:var(--dim); display:block}
+.hold-bar{height:16px; border-radius:8px; background:#1a2230; border:1px solid var(--line); overflow:hidden; margin-top:8px}
+.hold-bar>div{height:100%; width:0%; background:var(--green)}
+.goal-chips{display:flex; gap:8px; justify-content:center; margin-top:10px; flex-wrap:wrap}
+.seq-line{font-size:16px; color:var(--dim); margin-top:4px}
+.seq-line .cur{color:var(--accent); font-weight:800; font-size:18px}
+.bpm-row{display:flex; align-items:center; gap:10px; margin-bottom:10px}
+.metro-row{display:flex; align-items:center; gap:10px; margin-top:6px}
+.metro-dot{width:16px; height:16px; border-radius:50%; background:#1a2230; border:2px solid var(--line); display:inline-block; flex:none}
+.metro-dot.on{background:var(--accent); border-color:var(--accent)}
+.target-card.success{border-color:var(--green); box-shadow:0 0 0 3px rgba(62,224,137,.3)}
+
+/* ---------- progress ---------- */
+.spot{display:flex; flex-direction:column; gap:8px}
+.stat-row{display:flex; gap:10px; flex-wrap:wrap}
+.stat-box{flex:1; min-width:140px; background:var(--card2); border:1px solid var(--line); border-radius:12px; padding:10px}
+.stat-box b{font-size:24px; display:block}
+.prow{display:flex; align-items:center; gap:10px; margin-bottom:8px}
+.pname{width:92px; font-size:15px; font-weight:700; flex:none}
+.pbar{height:18px; background:#1a2230; border-radius:9px; overflow:hidden; border:1px solid var(--line); flex:1}
+.pbar>div{height:100%; width:0%; background:var(--green)}
+.pbar>div.yellow{background:var(--yellow)}
+.pbar>div.red{background:var(--red)}
+.pbar>div.none{background:#3a4656}
+.pval{width:58px; text-align:right; font-size:14px; color:var(--dim); flex:none; font-variant-numeric:tabular-nums}
+
+/* ---------- modals & toast ---------- */
+.modal{position:fixed; inset:0; background:rgba(2,6,10,.72); display:none; align-items:flex-end; justify-content:center; z-index:50}
+.modal.open{display:flex}
+.modal-card{
+  background:#10161d; border:1px solid var(--line); border-radius:20px 20px 0 0;
+  width:100%; max-width:640px; max-height:88vh; overflow:auto;
+  padding:16px; padding-bottom:calc(20px + env(safe-area-inset-bottom));
+}
+.modal-head{display:flex; align-items:center; justify-content:space-between; margin-bottom:8px}
+.modal-head b{font-size:21px}
+.sa-now{font-size:16px; font-weight:700; margin:6px 0 10px}
+.sa-live-freq{font-size:44px; font-weight:800; font-variant-numeric:tabular-nums; min-height:1.2em}
+.live-card{text-align:center}
+.grid13{display:grid; grid-template-columns:repeat(3,1fr); gap:8px}
+.grid13 .chip{width:100%}
+#toast{
+  position:fixed; left:50%; bottom:calc(88px + env(safe-area-inset-bottom));
+  transform:translateX(-50%); background:#233043; color:var(--text);
+  padding:10px 16px; border-radius:12px; border:1px solid var(--line);
+  opacity:0; pointer-events:none; transition:opacity .25s; z-index:60;
+  max-width:90vw; text-align:center; font-size:15px;
+}
+#toast.show{opacity:1}
+</style>
+</head>
+<body>
+
+<header>
+  <div class="row-a">
+    <div class="brand">🪈 Bansuri Practice</div>
+    <button id="micBtn" class="btn">🎙 Mic: Off</button>
+  </div>
+  <div class="row-b">
+    <select id="profileSel" class="sel" aria-label="My flute">
+      <option value="pvc">PVC Radhe C</option>
+      <option value="wood">Wooden C</option>
+    </select>
+    <button id="setSaBtn" class="btn btn-primary">Set Sa</button>
+  </div>
+  <div class="row-c">
+    <button id="droneBtn" class="btn" style="flex:1">🎶 Sa–Pa Drone: Off</button>
+    <input id="droneVol" type="range" min="0" max="100" value="35" aria-label="Drone volume">
+  </div>
+</header>
+
+<main>
+
+  <!-- ============ 1. TUNER / LISTEN ============ -->
+  <section id="sec-listen">
+    <div class="card">
+      <div id="swarBig" class="swar-big">—</div>
+      <div id="swarSub" class="swar-sub">Mic is off — tap Mic up top</div>
+      <div id="tuneWord" class="tune-word"></div>
+      <div class="cents-wrap">
+        <div class="cents-meter">
+          <div class="cents-center"></div>
+          <div id="centsNeedle" class="cents-needle"></div>
+        </div>
+        <div class="cents-labels"><span>−50</span><span>0 (perfect)</span><span>+50</span></div>
+      </div>
+      <div id="freqLine" class="freq-line"></div>
+      <div class="stab-row"><span>Steady</span><div class="stab-bar"><div id="stabFill"></div></div></div>
+      <div id="hintLine" class="hint"></div>
+    </div>
+    <div class="card">
+      <div class="vol-row"><span>Mic level</span><div class="vol-bar"><div id="volFill"></div></div></div>
+      <canvas id="pitchGraph"></canvas>
+      <div class="small dim" style="margin-top:6px">Last 5 seconds. Green = in tune. The little labels on the left are the swars.</div>
+      <div class="small dim" style="margin-top:4px">Tip: if the Sa–Pa drone confuses the tuner, use earphones or turn the drone volume down.</div>
+      <div class="small dim" id="tuneModeLine" style="margin-top:4px"></div>
+    </div>
+  </section>
+
+  <!-- ============ 2. LEARN ============ -->
+  <section id="sec-learn" hidden>
+    <h2>How to play each swar</h2>
+    <p class="dim" style="margin-top:0">Tap a swar to see exactly how to play it. The filled circles are closed holes.</p>
+    <div id="learnList"></div>
+  </section>
+
+  <!-- ============ 3. PRACTICE ============ -->
+  <section id="sec-practice" hidden>
+    <div id="practicePicker">
+      <h2>Pick what to practice</h2>
+      <button class="mode-btn" data-mode="target">Target Swar
+        <span>Play one note until it locks. Great for Pa.</span></button>
+      <button class="mode-btn" data-mode="mandra">Mandra Practice
+        <span>Low Pa, Dha and Ni with a hold timer. Your main practice.</span></button>
+      <button class="mode-btn" data-mode="sargam">Sargam Trainer
+        <span>Play note by note, with a metronome.</span></button>
+    </div>
+    <div id="practiceRun" hidden>
+      <div class="run-top">
+        <button id="backBtn" class="btn btn-ghost">‹ Change</button>
+        <div id="modeTitle" class="mode-title"></div>
+      </div>
+      <div id="modeControls"></div>
+      <div class="card target-card" id="targetCard">
+        <div id="targetLabel" class="target-label">NOW PLAY</div>
+        <div id="targetBig" class="target-big">—</div>
+        <div id="targetNote" class="target-note"></div>
+        <button id="refToneBtn" class="btn" style="margin-top:10px">🔊 Hear this note</button>
+        <div class="hold-line">Held: <b id="holdVal">0.0</b>s <span id="bestLine" class="best-line"></span></div>
+        <div id="holdGoal" class="hold-goal"></div>
+        <div class="hold-bar"><div id="holdBarFill"></div></div>
+        <div class="goal-chips" id="goalChips"></div>
+        <div id="practiceHint" class="hint"></div>
+      </div>
+    </div>
+  </section>
+
+  <!-- ============ 4. PROGRESS ============ -->
+  <section id="sec-progress" hidden>
+    <h2>My progress</h2>
+    <div class="card spot">
+      <div style="font-size:18px; font-weight:800">Pa — your main note</div>
+      <div class="small dim">Pa is tracked on its own because it is the tricky one.</div>
+      <div class="prow"><span class="pname">In tune</span><div class="pbar"><div id="paAccBar"></div></div><span class="pval" id="paAccVal">—</span></div>
+      <div class="small dim" id="paHeard"></div>
+      <div>Best Pa hold: <b id="paBest">—</b></div>
+    </div>
+    <div class="card">
+      <div class="stat-row">
+        <div class="stat-box"><span class="small dim">Practice minutes (all time)</span><b id="statMin">0</b></div>
+        <div class="stat-box"><span class="small dim">Streak</span><b id="statStreak">0 days</b></div>
+      </div>
+      <div class="small dim" style="margin-top:8px">A day counts when you play for 1 minute or more.</div>
+    </div>
+    <div class="card">
+      <div style="font-weight:800; margin-bottom:8px">Last 7 days — each swar</div>
+      <div id="swarBars"></div>
+      <div class="small dim" style="margin-top:6px">Green = mostly in tune. Red = needs work. “—” = not played yet.</div>
+    </div>
+    <button id="clearBtn" class="btn" style="width:100%; border-color:var(--red); color:var(--red)">Clear my data</button>
+  </section>
+
+</main>
+
+<nav id="tabs">
+  <button class="tab active" data-tab="listen"><span class="ticon">🎧</span>Listen</button>
+  <button class="tab" data-tab="learn"><span class="ticon">📖</span>Learn</button>
+  <button class="tab" data-tab="practice"><span class="ticon">🎯</span>Practice</button>
+  <button class="tab" data-tab="progress"><span class="ticon">📈</span>Progress</button>
+</nav>
+
+<!-- swar detail modal -->
+<div class="modal" id="modalSwar">
+  <div class="modal-card">
+    <div class="modal-head"><b id="swarTitle">Pa</b><button class="btn btn-ghost" id="closeSwar">Close</button></div>
+    <div id="swarModalSub" class="dim"></div>
+    <div id="swarDia"></div>
+    <div id="swarPaWarn" class="pa-warn" hidden></div>
+    <div id="swarHow" style="font-size:17px; margin:8px 0"></div>
+    <div id="swarOctNote" class="tip"></div>
+    <div class="chip-row" style="margin-top:10px">
+      <button class="btn btn-primary" id="swarRefMid">🔊 Hear it</button>
+      <button class="btn" id="swarRefLow" hidden>🔊 Hear it low</button>
+    </div>
+  </div>
+</div>
+
+<!-- set Sa modal -->
+<div class="modal" id="modalSa">
+  <div class="modal-card">
+    <div class="modal-head"><b>Set Sa</b><button class="btn btn-ghost" id="closeSa">Close</button></div>
+    <p class="dim" style="margin-top:0">Sa is your home note. Every other swar is counted from it. Do this once for each flute.</p>
+    <div id="saNowLine" class="sa-now"></div>
+    <div class="card live-card">
+      <div class="dim">Your flute right now</div>
+      <div id="saLiveFreq" class="sa-live-freq">—</div>
+      <div id="saLiveHint" class="hint" style="text-align:left">Tap “Mic: Off” up top, then play Sa (3 holes closed) the way you normally play — relaxed, not forced — for about 2 seconds.</div>
+      <button id="saLockBtn" class="btn btn-primary" style="width:100%; margin-top:10px" disabled>Set Sa from my flute</button>
+    </div>
+    <div class="card">
+      <div class="dim" style="margin-bottom:6px">Or just choose a note</div>
+      <select id="saNoteSel" class="sel"></select>
+      <div id="saNoteFreq" class="small dim" style="margin-top:6px"></div>
+    </div>
+    <div class="card">
+      <div class="dim" style="margin-bottom:6px">Note spacing</div>
+      <div class="chip-row" style="margin-bottom:6px">
+        <button class="chip" id="tuneJust" type="button">Pure (drone-like)</button>
+        <button class="chip" id="tuneEt" type="button">Piano-style</button>
+      </div>
+      <div class="small dim">Pure is how the bansuri and the tanpura naturally sound — smooth swars sit there without forcing air. Choose Piano-style only if you play along with a keyboard or harmonium.</div>
+    </div>
+  </div>
+</div>
+
+<!-- pick a swar modal -->
+<div class="modal" id="modalPick">
+  <div class="modal-card">
+    <div class="modal-head"><b>Choose a swar</b><button class="btn btn-ghost" id="closePick">Close</button></div>
+    <div class="grid13" id="pickGrid"></div>
+  </div>
+</div>
+
+<div id="toast"></div>
+
+<script>
+(function(){
+"use strict";
+
+/* ================= helpers ================= */
+var $ = function(id){ return document.getElementById(id); };
+function clamp(v,a,b){ return Math.min(b, Math.max(a, v)); }
+function el(tag, cls, txt){ var e=document.createElement(tag); if(cls) e.className=cls; if(txt!=null) e.textContent=txt; return e; }
+function lsGet(k,d){ try{ var v=localStorage.getItem(k); return v==null? d : JSON.parse(v); }catch(e){ return d; } }
+function lsSet(k,v){ try{ localStorage.setItem(k, JSON.stringify(v)); }catch(e){} }
+function lsDel(k){ try{ localStorage.removeItem(k); }catch(e){} }
+function fmtHz(f){ return f.toFixed(1)+" Hz"; }
+function octName(o){ return o<0 ? "Mandra" : (o===0 ? "Madhya" : "Taar"); }
+
+/* ================= music data (fixed) ================= */
+var WESTERN = ["C","C#","D","D#","E","F","F#","G","G#","A","A#","B"];
+var SWARS = [
+  {key:"Sa",  name:"Sa",       west:"C",  off:0},
+  {key:"kRe", name:"Komal Re", west:"Db", off:1},
+  {key:"Re",  name:"Re",       west:"D",  off:2},
+  {key:"kGa", name:"Komal Ga", west:"Eb", off:3},
+  {key:"Ga",  name:"Ga",       west:"E",  off:4},
+  {key:"Ma",  name:"Ma",       west:"F",  off:5},
+  {key:"tMa", name:"Teevra Ma",west:"F#", off:6},
+  {key:"Pa",  name:"Pa",       west:"G",  off:7},
+  {key:"kDha",name:"Komal Dha",west:"Ab", off:8},
+  {key:"Dha", name:"Dha",      west:"A",  off:9},
+  {key:"kNi", name:"Komal Ni", west:"Bb", off:10},
+  {key:"Ni",  name:"Ni",       west:"B",  off:11}
+];
+/* hole states counting from the blowing hole: closed / half / quarter / open */
+var FING = {
+  Sa:  ["closed","closed","closed","open","open","open"],
+  kRe: ["closed","closed","half","open","open","open"],
+  Re:  ["closed","closed","open","open","open","open"],
+  kGa: ["closed","half","open","open","open","open"],
+  Ga:  ["closed","open","open","open","open","open"],
+  Ma:  ["half","open","open","open","open","open"],
+  tMa: ["quarter","open","open","open","open","open"],
+  Pa:  ["closed","closed","closed","closed","closed","closed"],
+  kDha:["closed","closed","closed","closed","closed","half"],
+  Dha: ["closed","closed","closed","closed","closed","open"],
+  kNi: ["closed","closed","closed","closed","half","open"],
+  Ni:  ["closed","closed","closed","closed","open","open"],
+  Sa2: ["closed","closed","closed","open","open","open"]
+};
+var SWAR_HOW = {
+  Sa:  "Close holes 1, 2 and 3. Keep holes 4, 5 and 6 open.",
+  kRe: "Close holes 1 and 2 fully. Half-close hole 3 — roll your finger so only half the hole is covered.",
+  Re:  "Close holes 1 and 2. Keep the rest open.",
+  kGa: "Close hole 1 fully. Half-close hole 2.",
+  Ga:  "Close only hole 1. Keep the rest open.",
+  Ma:  "Only hole 1 is half-closed. Roll your finger on the top hole so it is half open. Keep holes 2 to 6 open.",
+  tMa: "Start from Pa (all holes open) and shade hole 1 a little — less covered than for Ma.",
+  Pa:  "Close all 6 holes. Soft air gives low Pa (Mandra). Stronger air gives middle Pa (Madhya).",
+  kDha:"Close holes 1 to 5. Half-close hole 6 with the edge of your ring finger.",
+  Dha: "Close holes 1 to 5. Leave hole 6 open.",
+  kNi: "Close holes 1 to 4. Half-close hole 5. Leave hole 6 open.",
+  Ni:  "Close holes 1 to 4. Leave holes 5 and 6 open.",
+  Sa2: "Same as Sa — close holes 1, 2 and 3 — but blow a little harder to reach the higher note."
+};
+var COACH = {
+  Sa:  "Sa: close holes 1, 2, 3.",
+  kRe: "Komal Re: holes 1 and 2 closed, hole 3 half.",
+  Re:  "Re: close holes 1 and 2.",
+  kGa: "Komal Ga: hole 1 closed, hole 2 half.",
+  Ga:  "Ga: close hole 1.",
+  Ma:  "Ma: hole 1 half-closed.",
+  tMa: "Teevra Ma: all open, shade hole 1 a little.",
+  Pa:  "Pa needs all 6 holes closed. Lay the flat pad of your right-hand ring finger over hole 6.",
+  kDha:"Komal Dha: 5 closed, hole 6 half.",
+  Dha: "Dha: 5 closed, hole 6 open.",
+  kNi: "Komal Ni: 4 closed, hole 5 half.",
+  Ni:  "Ni: 4 closed, holes 5 and 6 open."
+};
+var SARGAMS = [
+  {name:"Going up", seq:[["Sa",0],["Re",0],["Ga",0],["Ma",0],["Pa",0],["Dha",0],["Ni",0],["Sa",1]]},
+  {name:"Coming down", seq:[["Sa",1],["Ni",0],["Dha",0],["Pa",0],["Ma",0],["Ga",0],["Re",0],["Sa",0]]},
+  {name:"Alankar: Sa Re Ga Re Sa", seq:[["Sa",0],["Re",0],["Ga",0],["Re",0],["Sa",0]]},
+  {name:"Alankar: Pa Dha Ni Dha Pa", seq:[["Pa",0],["Dha",0],["Ni",0],["Dha",0],["Pa",0]]}
+];
+var MANDRA_SEQ = [{key:"Pa",oct:-1},{key:"Dha",oct:-1},{key:"Ni",oct:-1}];
+var MANDRA_KEYS = ["Pa","Dha","Ni"];
+
+/* ================= saved state ================= */
+var profiles = lsGet("bp.profiles", null);
+if(!profiles || !profiles.pvc || !profiles.wood){
+  profiles = { pvc:{saFreq:523.25, saNote:"C"}, wood:{saFreq:523.25, saNote:"C"} };
+  lsSet("bp.profiles", profiles);
+}
+var activeProfile = lsGet("bp.active", "pvc");
+if(activeProfile !== "pvc" && activeProfile !== "wood") activeProfile = "pvc";
+var settings = lsGet("bp.settings", {});
+settings.bpm = clamp(settings.bpm || 60, 40, 120);
+if(settings.droneVol == null) settings.droneVol = 35;
+if(!settings.goal) settings.goal = 3;
+if(settings.tuning!=="just" && settings.tuning!=="et") settings.tuning="just";
+var stats = lsGet("bp.stats", null) || {days:{}, best:{}};
+if(!stats.days) stats.days = {};
+if(!stats.best) stats.best = {};
+
+function saveProfiles(){ lsSet("bp.profiles", profiles); }
+function saveSettings(){ lsSet("bp.settings", settings); }
+function saFreq(){ return profiles[activeProfile].saFreq; }
+function swarFreq(off){ return saFreq() * Math.pow(2, targetCents(off)/1200); }
+function todayKey(){
+  var d=new Date();
+  return d.getFullYear()+"-"+String(d.getMonth()+1).padStart(2,"0")+"-"+String(d.getDate()).padStart(2,"0");
+}
+
+/* ================= toast ================= */
+var toastTimer=null;
+function toast(msg){
+  var t=$("toast"); t.textContent=msg; t.classList.add("show");
+  clearTimeout(toastTimer);
+  toastTimer=setTimeout(function(){ t.classList.remove("show"); }, 2400);
+}
+
+/* ================= audio ================= */
+var actx=null;
+function ensureAudio(){
+  if(!actx){
+    var AC = window.AudioContext || window.webkitAudioContext;
+    if(!AC) return null;
+    actx = new AC();
+  }
+  if(actx.state==="suspended"){ actx.resume(); }
+  return actx;
+}
+function playTone(freq, dur, vol){
+  dur = dur||1.5; vol = vol==null?0.18:vol;
+  if(!ensureAudio()) return;
+  var t0=actx.currentTime;
+  var o=actx.createOscillator(); o.type="sine"; o.frequency.value=freq;
+  var g=actx.createGain();
+  g.gain.setValueAtTime(0.0001, t0);
+  g.gain.linearRampToValueAtTime(vol, t0+0.04);
+  g.gain.setValueAtTime(vol, t0+Math.max(0.1, dur-0.25));
+  g.gain.linearRampToValueAtTime(0.0001, t0+dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(t0); o.stop(t0+dur+0.05);
+}
+function playSuccess(){
+  var s=saFreq();
+  playTone(s, 0.16, 0.14);
+  setTimeout(function(){ playTone(s*1.5, 0.16, 0.13); }, 150);
+  setTimeout(function(){ playTone(s*2, 0.24, 0.13); }, 300);
+}
+function playBlip(){ playTone(saFreq()*2, 0.1, 0.08); }
+
+/* ---- drone ---- */
+var drone={on:false, nodes:[], gain:null};
+function droneStart(){
+  if(!ensureAudio()) return;
+  droneStop(true);
+  var g=actx.createGain();
+  g.gain.value = (settings.droneVol/100)*0.14;
+  var fSa=saFreq();
+  function mk(f, v, type){
+    var o=actx.createOscillator(); o.type=type||"sine"; o.frequency.value=f;
+    var og=actx.createGain(); og.gain.value=v;
+    o.connect(og); og.connect(g); o.start(); drone.nodes.push(o);
+  }
+  mk(fSa/2, 0.35, "triangle");   /* soft low body */
+  mk(fSa, 0.5);                  /* Sa */
+  mk(fSa*2, 0.12);               /* Sa up, quiet */
+  mk(fSa*1.5, 0.4); /* Pa — pure fifth, like the tanpura */
+  g.connect(actx.destination);
+  drone.gain=g; drone.on=true;
+  var b=$("droneBtn"); b.textContent="🎶 Sa–Pa Drone: On"; b.classList.add("btn-on");
+}
+function droneStop(silent){
+  drone.nodes.forEach(function(o){ try{o.stop();}catch(e){} });
+  drone.nodes=[]; drone.gain=null; drone.on=false;
+  if(!silent){ var b=$("droneBtn"); b.textContent="🎶 Sa–Pa Drone: Off"; b.classList.remove("btn-on"); }
+}
+function droneRetune(){ if(drone.on) droneStart(); }
+
+/* ---- metronome ---- */
+var metro={on:false, next:0, beat:0, iv:null};
+function scheduleClick(time){
+  var o=actx.createOscillator(); o.type="sine";
+  o.frequency.value = (metro.beat%4===0)?1050:750;
+  var g=actx.createGain();
+  g.gain.setValueAtTime(0.0001, time);
+  g.gain.exponentialRampToValueAtTime(0.16, time+0.005);
+  g.gain.exponentialRampToValueAtTime(0.0001, time+0.07);
+  o.connect(g); g.connect(actx.destination);
+  o.start(time); o.stop(time+0.1);
+}
+function pulseDot(){
+  var d=$("metroDot"); if(!d) return;
+  d.classList.add("on");
+  setTimeout(function(){ d.classList.remove("on"); }, 110);
+}
+function metroStart(){
+  if(!ensureAudio()) return;
+  metroStop();
+  metro.on=true; metro.beat=0; metro.next=actx.currentTime+0.12;
+  metro.iv=setInterval(function(){
+    while(metro.next < actx.currentTime + 0.18){
+      scheduleClick(metro.next);
+      var delay=Math.max(0,(metro.next-actx.currentTime)*1000);
+      setTimeout(pulseDot, delay);
+      metro.next += 60/settings.bpm;
+      metro.beat++;
+    }
+  }, 30);
+}
+function metroStop(){
+  metro.on=false;
+  if(metro.iv){ clearInterval(metro.iv); metro.iv=null; }
+}
+
+/* ================= microphone ================= */
+var micOn=false, micStarting=false, stream=null, analyser=null, timeBuf=null;
+var RMS_TH=0.012, CLARITY_TH=0.5;
+
+function updateMicBtn(){
+  var b=$("micBtn");
+  b.textContent = micOn ? "🎙 Mic: On" : "🎙 Mic: Off";
+  b.classList.toggle("btn-on", micOn);
+}
+async function startMic(){
+  if(micOn || micStarting) return;
+  if(!navigator.mediaDevices || !navigator.mediaDevices.getUserMedia){
+    toast("Microphone not available. Open this file in Chrome on your phone.");
+    return;
+  }
+  micStarting=true;
+  try{
+    if(!ensureAudio()) throw new Error("no audio");
+    var s = await navigator.mediaDevices.getUserMedia({
+      audio:{echoCancellation:false, noiseSuppression:false, autoGainControl:false}
+    });
+    stream=s;
+    var src=actx.createMediaStreamSource(stream);
+    analyser=actx.createAnalyser();
+    analyser.fftSize=2048;
+    src.connect(analyser);
+    timeBuf=new Float32Array(analyser.fftSize);
+    micOn=true; frames=[]; history=[];
+    disp={status:"wait", hint:"Listening. Blow gently into the flute."};
+    updateMicBtn();
+    renderTuner(performance.now());
+  }catch(e){
+    micOn=false; updateMicBtn();
+    if(e && (e.name==="NotAllowedError" || e.name==="SecurityError")){
+      disp={status:"blocked", hint:"Microphone blocked. Tap the lock icon in Chrome, allow Microphone, then reload."};
+      renderTuner(performance.now());
+    }else if(e && e.name==="NotFoundError"){
+      toast("No microphone found on this device.");
+    }else{
+      toast("Could not start the microphone.");
+    }
+  }
+  micStarting=false;
+}
+function stopMic(){
+  if(stream){ stream.getTracks().forEach(function(t){ t.stop(); }); }
+  stream=null; analyser=null; micOn=false;
+  frames=[]; history=[];
+  disp={status:"micOff", hint:"Mic is off. Tap the Mic button up top."};
+  updateMicBtn();
+  renderTuner(performance.now());
+}
+
+/* ================= pitch detection (autocorrelation / MPM) ================= */
+function detectPitch(buf, sr){
+  var N=buf.length, i, j, lag;
+  var sumSq=0;
+  for(i=0;i<N;i++){ var v=buf[i]; sumSq+=v*v; }
+  var rms=Math.sqrt(sumSq/N);
+  if(rms < RMS_TH) return {freq:-1, clarity:0, rms:rms};
+
+  var maxLag=Math.min(Math.floor(sr/290), N-2);   /* ~290 Hz and below is out of range */
+  var minLag=Math.max(2, Math.floor(sr/1150));    /* ~1150 Hz and above is out of range */
+  if(maxLag-minLag < 10) return {freq:-1, clarity:0, rms:rms};
+
+  /* normalised square-difference function (McLeod), computed from autocorrelation */
+  var nsdf=new Float32Array(maxLag+2);
+  var div=new Float32Array(maxLag+1);
+  var d=2*sumSq; div[0]=d;
+  for(i=1;i<=maxLag;i++){
+    d -= buf[N-i]*buf[N-i] + buf[i-1]*buf[i-1];
+    div[i]=d;
+  }
+  for(lag=minLag; lag<=maxLag; lag++){
+    var c=0, lim=N-lag;
+    for(j=0;j<lim;j++) c += buf[j]*buf[j+lag];
+    nsdf[lag] = (div[lag]>1e-9) ? 2*c/div[lag] : 0;
+  }
+
+  /* find local maxima between positive zero crossings */
+  var peaks=[], start=-1;
+  if(nsdf[minLag]>0) start=minLag;  /* a positive region may begin before the scan window */
+  for(lag=minLag+1; lag<maxLag; lag++){
+    var vv=nsdf[lag], pp=nsdf[lag-1];
+    if(vv>0 && pp<=0){ start=lag; }
+    else if(start>=0 && vv<=0 && pp>0){
+      var bl=start, bv=nsdf[start];
+      for(var k=start+1;k<lag;k++){ if(nsdf[k]>bv){ bv=nsdf[k]; bl=k; } }
+      peaks.push([bl,bv]); start=-1;
+    }
+  }
+  if(!peaks.length) return {freq:-1, clarity:0, rms:rms};
+
+  var mv=-1; for(i=0;i<peaks.length;i++) if(peaks[i][1]>mv) mv=peaks[i][1];
+  var th=mv*0.93, pick=peaks[0];
+  for(i=0;i<peaks.length;i++){ if(peaks[i][1]>=th){ pick=peaks[i]; break; } }
+
+  var tau=pick[0];
+  var y1=nsdf[tau-1], y2=nsdf[tau], y3=nsdf[tau+1];
+  var den=y1-2*y2+y3;
+  if(den < -1e-12) tau = tau + (y1-y3)/(2*den);  /* parabolic refine (den<0 at a maximum) */
+  var freq=sr/tau;
+  if(freq<290 || freq>1150) return {freq:-1, clarity:0, rms:rms};
+  return {freq:freq, clarity:pick[1], rms:rms};
+}
+
+/* ================= analysis loop ================= */
+var frames=[];      /* last analysis frames {t, valid, freq, clarity, rms, code, tC, dev} */
+var history=[];     /* {t, v (semitone value) or null, dev} for the graph */
+var lastAnalysis=0;
+var disp={status:"micOff", hint:"Mic is off. Tap the Mic button up top."};
+var currentTab="listen";
+
+function analyse(now){
+  if(!micOn || !analyser) return;
+  analyser.getFloatTimeDomainData(timeBuf);
+  var res=detectPitch(timeBuf, actx.sampleRate);
+  var fr={t:now, rms:res.rms, clarity:res.clarity, freq:res.freq, valid:false, code:0, tC:0, dev:0};
+  if(res.freq>0 && res.clarity>=CLARITY_TH){
+    var nt=nearestTarget(1200*Math.log2(res.freq/saFreq()));
+    fr.code=(nt.oct+2)*12+nt.idx;
+    fr.tC=nt.targetC;
+    fr.dev=clamp(nt.dev, -60, 60);
+    fr.valid=true;
+  }
+  frames.push(fr);
+  if(frames.length>60) frames.splice(0, frames.length-60);
+
+  history.push({t:now, v: fr.valid ? ((fr.tC + fr.dev)/100) : null, dev: fr.dev});
+  while(history.length && now-history[0].t > 5200) history.shift();
+
+  computeDisplay(now);
+  practiceTick(now);
+  statsTick(now);
+}
+
+function computeDisplay(now){
+  var d;
+  if(!micOn){
+    d={status:"micOff"};
+  }else if(!frames.length){
+    d={status:"wait"};
+  }else{
+    var last=frames[frames.length-1];
+    var recent=frames.filter(function(f){ return now-f.t<1300; });
+    var last5=frames.slice(-5);
+    var valids5=last5.filter(function(f){ return f.valid; });
+    if(last.rms < RMS_TH){
+      d={status:"wait"};
+    }else if(valids5.length<3){
+      d={status: last.rms>=0.02 ? "noTone" : "wait"};
+    }else{
+      var fs=valids5.map(function(f){ return f.freq; }).sort(function(a,b){ return a-b; });
+      var med = (fs.length%2) ? fs[(fs.length-1)/2] : (fs[fs.length/2-1]+fs[fs.length/2])/2;
+      var nt=nearestTarget(1200*Math.log2(med/saFreq()));
+      var dev=clamp(nt.dev, -50, 50);
+      var idx=nt.idx, oct=nt.oct;
+      var sw=SWARS[idx];
+      var valids1=recent.filter(function(f){ return f.valid; });
+      var good=0;
+      valids1.forEach(function(f){ if(f.code===(oct+2)*12+idx && Math.abs(f.dev-dev)<=35) good++; });
+      var stab = recent.length ? good/recent.length : 0;
+      d={
+        status:"note", swar:sw,
+        name:(idx===0 && oct>=1) ? "Sa'" : sw.name,
+        west:sw.west, oct:oct, octName:octName(oct),
+        dev:dev, freq:med, target:saFreq()*Math.pow(2, nt.targetC/1200),
+        stab:stab, idx:idx
+      };
+    }
+  }
+  d.hint=computeHint(now, d);
+  disp=d;
+  renderTuner(now);
+}
+
+function swarNameOfCode(code){
+  var idx=code%12, oct=Math.floor(code/12)-2;
+  var s = (idx===0 && oct>=1) ? "Sa'" : SWARS[idx].name;
+  if(oct<0) s+=" (low)";
+  else if(oct>0 && idx!==0) s+=" (high)";
+  return s;
+}
+
+/* ---- note spacing: pure (just / drone-like, default) or piano-style (equal) ---- */
+var JUST_CENTS=[0,111.73,203.91,315.64,386.31,498.04,590.22,701.96,813.69,884.36,1017.6,1088.27,1200];
+function targetCents(off){
+  return settings.tuning==="just" ? JUST_CENTS[off] : off*100;
+}
+function nearestTarget(cents){
+  var bestI=0, bestO=0, bestD=Infinity, bestC=0, oc, i, dd, tc;
+  for(oc=-1; oc<=2; oc++){
+    for(i=0;i<=11;i++){
+      tc=targetCents(i)+oc*1200;
+      dd=cents-tc;
+      if(Math.abs(dd)<Math.abs(bestD)){ bestD=dd; bestI=i; bestO=oc; bestC=tc; }
+    }
+  }
+  return {idx:bestI, oct:bestO, dev:bestD, targetC:bestC};
+}
+function computeHint(now, d){
+  if(d.status==="micOff") return "Mic is off. Tap the Mic button up top.";
+  if(d.status==="blocked") return "Microphone blocked. Tap the lock icon in Chrome, allow Microphone, then reload.";
+  if(d.status==="wait") return "Waiting for sound… blow gently into the flute.";
+  if(d.status==="noTone"){
+    var recent=frames.filter(function(f){ return now-f.t<1200; });
+    if(recent.length>=8 && recent.every(function(f){ return !f.valid; })){
+      return "Hissing only. Check that all holes are fully sealed, especially hole 6.";
+    }
+    return "No clear tone - check your hole seal.";
+  }
+  /* we have a note */
+  var rv=frames.filter(function(f){ return now-f.t<1200 && f.valid; });
+  var changes=0, pairs={};
+  for(var i=1;i<rv.length;i++){
+    if(rv[i].code!==rv[i-1].code){
+      changes++;
+      var a=rv[i-1].code, b=rv[i].code;
+      var key=Math.min(a,b)+"|"+Math.max(a,b);
+      pairs[key]=(pairs[key]||0)+1;
+    }
+  }
+  if(changes>=4 && rv.length>=8){
+    var best=null, bc=0;
+    for(var k in pairs){ if(pairs[k]>bc){ bc=pairs[k]; best=k; } }
+    if(best){
+      var parts=best.split("|"), na=+parts[0], nb=+parts[1];
+      var ia=na%12, ib=nb%12, oa=Math.floor(na/12)-2, ob=Math.floor(nb/12)-2;
+      if(((ia===7&&ib===9)||(ia===9&&ib===7)) && oa===ob){
+        return "Pitch is jumping Pa to Dha. Check hole 6.";
+      }
+      return "Pitch is jumping "+swarNameOfCode(na)+" to "+swarNameOfCode(nb)+". Check that the holes between them are fully sealed.";
+    }
+  }
+  if(d.stab<0.45 && rv.length>=8) return "Pitch is unsteady. Keep the air smooth and steady.";
+  var ad=Math.abs(d.dev);
+  if(d.swar.key==="Pa" && ad>15) return COACH.Pa;
+  if(ad<=15) return "In tune. Hold it steady.";
+  if(ad<=25) return d.dev>0 ? "Very close. A tiny bit sharp — relax a touch." : "Very close. A tiny bit flat — a touch more air, gently.";
+  if(d.dev>0) return "A bit sharp. A little less air, gently.";
+  return "A bit flat. A little more air, gently.";
+}
+
+function zoneFor(dev){ var a=Math.abs(dev); return a<=15 ? "green" : (a<=35 ? "yellow" : "red"); }
+function wordFor(dev){
+  var a=Math.abs(dev);
+  if(a<=15) return "In tune";
+  if(dev>0) return a<=35 ? "Slightly sharp" : "Too sharp";
+  return a<=35 ? "Slightly flat" : "Too flat";
+}
+
+/* ================= tuner render ================= */
+function renderTuner(now){
+  var d=disp;
+  var big=$("swarBig"), sub=$("swarSub"), word=$("tuneWord"),
+      needle=$("centsNeedle"), fl=$("freqLine"), stab=$("stabFill"), hint=$("hintLine");
+  if(d.status==="note"){
+    var z=zoneFor(d.dev);
+    big.textContent=d.name;
+    big.className="swar-big z-"+z;
+    sub.textContent=d.west+"  ·  "+d.octName;
+    word.textContent=wordFor(d.dev);
+    word.className="tune-word z-"+z;
+    needle.style.left=(d.dev+50)+"%";
+    fl.textContent="Heard "+d.freq.toFixed(1)+" Hz · Target "+d.target.toFixed(1)+" Hz · "+
+      (d.dev>0?"+":"")+Math.round(d.dev)+" cents";
+    stab.style.width=Math.round(d.stab*100)+"%";
+  }else{
+    big.textContent="—";
+    big.className="swar-big";
+    if(d.status==="micOff") sub.textContent="Mic is off — tap Mic up top";
+    else if(d.status==="blocked") sub.textContent="Microphone blocked";
+    else if(d.status==="noTone") sub.textContent="No clear tone";
+    else sub.textContent="Waiting for sound";
+    word.textContent="";
+    word.className="tune-word";
+    needle.style.left="50%";
+    fl.textContent="";
+    stab.style.width="0%";
+  }
+  hint.textContent=d.hint||"";
+  /* volume meter */
+  var volFill=$("volFill"), pct=0;
+  if(micOn && frames.length){
+    var rms=frames[frames.length-1].rms;
+    pct=clamp(Math.sqrt(rms/0.35)*100, 0, 100);
+  }
+  volFill.style.width=pct+"%";
+  drawGraph(now);
+}
+
+/* ---- pitch history graph ---- */
+var graphW=300, graphH=170;
+function sizeGraph(){
+  var c=$("pitchGraph");
+  if(!c) return;
+  var r=c.getBoundingClientRect();
+  if(r.width<10) return;
+  var dpr=window.devicePixelRatio||1;
+  graphW=r.width; graphH=170;
+  c.width=Math.round(graphW*dpr); c.height=Math.round(graphH*dpr);
+  c.getContext("2d").setTransform(dpr,0,0,dpr,0,0);
+}
+function drawGraph(now){
+  if(currentTab!=="listen") return;
+  var c=$("pitchGraph"); if(!c) return;
+  var g=c.getContext("2d");
+  var w=graphW, h=graphH;
+  g.clearRect(0,0,w,h);
+  var pts=history.filter(function(p){ return now-p.t<=5000; });
+  g.font="11px system-ui, sans-serif";
+  var has=pts.some(function(p){ return p.v!=null; });
+  if(!has){
+    g.fillStyle="#8fa3b8";
+    g.fillText("Play a note to see the last 5 seconds here.", 12, h/2);
+    return;
+  }
+  var vmin=Infinity, vmax=-Infinity, i, p;
+  for(i=0;i<pts.length;i++){ p=pts[i]; if(p.v!=null){ if(p.v<vmin)vmin=p.v; if(p.v>vmax)vmax=p.v; } }
+  vmin=Math.floor(vmin-0.8); vmax=Math.ceil(vmax+0.8);
+  if(vmax-vmin<2){ vmin-=1; vmax+=1; }
+  function X(t){ return 44 + (w-52) * (1 - (now-t)/5000); }
+  function Y(v){ return 10 + (h-20) * (1 - (v-vmin)/(vmax-vmin)); }
+  for(var oc=-1; oc<=2; oc++){
+    for(i=0;i<=11;i++){
+      var gv=(targetCents(i)+oc*1200)/100;
+      if(gv<vmin+0.04 || gv>vmax-0.04) continue;
+      var y=Y(gv);
+      g.strokeStyle="rgba(255,255,255,0.12)";
+      g.setLineDash([3,3]);
+      g.beginPath(); g.moveTo(44,y); g.lineTo(w-4,y); g.stroke();
+      g.setLineDash([]);
+      g.fillStyle="#8fa3b8"; g.textAlign="left";
+      g.fillText(swarNameOfCode((oc+2)*12+i), 4, y+4);
+    }
+  }
+  var prev=null;
+  g.lineWidth=2.5; g.lineJoin="round"; g.lineCap="round";
+  for(i=0;i<pts.length;i++){
+    p=pts[i];
+    if(p.v==null){ prev=null; continue; }
+    if(prev){
+      var z=zoneFor(prev.dev);
+      g.strokeStyle = z==="green" ? "#3ee089" : (z==="yellow" ? "#ffd75e" : "#ff7a7a");
+      g.beginPath(); g.moveTo(X(prev.t),Y(prev.v)); g.lineTo(X(p.t),Y(p.v)); g.stroke();
+    }
+    prev=p;
+  }
+}
+
+/* ================= stats ================= */
+var pend={sec:0, sw:{}};
+var lastStatsT=0, lastFlush=0;
+function statsTick(now){
+  if(disp.status!=="note"){ lastStatsT=now; return; }
+  var dt = lastStatsT ? Math.min(0.5,(now-lastStatsT)/1000) : 0;
+  lastStatsT=now;
+  if(dt<=0) return;
+  pend.sec+=dt;
+  var key=disp.swar.key;
+  if(key==="Sa" && disp.oct>=1) key="Sa2";   /* track high Sa' on its own */
+  var e=pend.sw[key] || (pend.sw[key]={g:0,t:0});
+  e.t+=dt;
+  if(Math.abs(disp.dev)<=25) e.g+=dt;
+  if(now-lastFlush>2000) flushStats();
+}
+function flushStats(){
+  if(pend.sec<0.05 && Object.keys(pend.sw).length===0) return;
+  var k=todayKey();
+  var day=stats.days[k] || (stats.days[k]={sec:0, sw:{}});
+  day.sec+=pend.sec;
+  for(var key in pend.sw){
+    var dsw=day.sw[key] || (day.sw[key]={g:0,t:0});
+    dsw.g+=pend.sw[key].g; dsw.t+=pend.sw[key].t;
+  }
+  pend={sec:0, sw:{}};
+  lastFlush=performance.now();
+  lsSet("bp.stats", stats);
+}
+function calcStreak(){
+  var n=0, d=new Date();
+  function key(dd){
+    return dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0");
+  }
+  var day=stats.days[key(d)];
+  if(!day || day.sec<60) d.setDate(d.getDate()-1);
+  while(true){
+    var dy=stats.days[key(d)];
+    if(dy && dy.sec>=60){ n++; d.setDate(d.getDate()-1); } else break;
+  }
+  return n;
+}
+function totalMinutes(){
+  var s=0;
+  for(var k in stats.days) s+=stats.days[k].sec||0;
+  return Math.round(s/60);
+}
+function swarAcc7(key){
+  var g=0, t=0, d=new Date();
+  function key2(dd){
+    return dd.getFullYear()+"-"+String(dd.getMonth()+1).padStart(2,"0")+"-"+String(dd.getDate()).padStart(2,"0");
+  }
+  for(var i=0;i<7;i++){
+    var day=stats.days[key2(d)];
+    if(day && day.sw[key]){ g+=day.sw[key].g; t+=day.sw[key].t; }
+    d.setDate(d.getDate()-1);
+  }
+  return {g:g, t:t};
+}
+function bestHoldFor(key, oct){
+  var b=0;
+  if(oct!=null){ b=stats.best[key+"|"+oct]||0; }
+  else{
+    for(var k in stats.best){ if(k.indexOf(key+"|")===0 && stats.best[k]>b) b=stats.best[k]; }
+  }
+  return b;
+}
+
+/* ================= learn ================= */
+function holesEl(fing, opts){
+  opts=opts||{};
+  var host=el("div","sr-holes");
+  for(var i=0;i<6;i++){
+    var h=el("i","hole "+(opts.small?"small ":"")+fing[i]+((i===5&&opts.hl6)?" hl-red":""));
+    host.appendChild(h);
+  }
+  return host;
+}
+function bigDiagram(fing, hl6){
+  var t=el("div","flute-tube");
+  var bhWrap=el("div","hole-wrap");
+  var bh=el("i","hole big");
+  bh.style.borderRadius="50% 50% 50% 50% / 60% 60% 40% 40%";
+  bh.style.width="16px";
+  bhWrap.appendChild(bh);
+  bhWrap.appendChild(el("span","hole-num","blow"));
+  t.appendChild(bhWrap);
+  for(var i=0;i<6;i++){
+    var wrap=el("div","hole-wrap");
+    var num=el("span","hole-num"+((i===5&&hl6)?" red":""), String(i+1));
+    var h=el("i","hole big "+fing[i]+((i===5&&hl6)?" hl-red":""));
+    wrap.appendChild(h); wrap.appendChild(num);
+    t.appendChild(wrap);
+  }
+  return t;
+}
+function renderLearn(){
+  var host=$("learnList"); host.innerHTML="";
+  var legend=el("div","legend-row");
+  legend.innerHTML='<span><i class="hole demo closed"></i>Closed</span>'+
+                   '<span><i class="hole demo half"></i>Half closed</span>'+
+                   '<span><i class="hole demo open"></i>Open</span>';
+  host.appendChild(legend);
+  SWARS.forEach(function(s){ host.appendChild(learnRow(s)); });
+  host.appendChild(learnRow({key:"Sa2", name:"Sa'", west:"C", off:12}));
+}
+function learnRow(s){
+  var row=el("div","swar-row"+(s.key==="Pa"?" pa-row":""));
+  row.setAttribute("role","button");
+  row.setAttribute("tabindex","0");
+  var left=el("div","sr-left");
+  var nm=el("b","sr-name", s.name);
+  var sub=el("span","sr-west", s.west+" · "+fmtHz(swarFreq(s.off)));
+  left.appendChild(nm); left.appendChild(sub);
+  var mid=holesEl(FING[s.key], {small:true, hl6:s.key==="Pa"});
+  var right=el("div","sr-right");
+  var rb=el("button","icon-btn","🔊");
+  rb.type="button";
+  rb.setAttribute("aria-label","Hear "+s.name);
+  rb.addEventListener("click", function(ev){ ev.stopPropagation(); playTone(swarFreq(s.off)); });
+  right.appendChild(rb);
+  row.appendChild(left); row.appendChild(mid); row.appendChild(right);
+  if(s.key==="Pa"){
+    var w=el("div","pa-warn");
+    w.textContent="⚠ Right-hand ring finger. Lay the flat pad across the hole, do not use the fingertip.";
+    row.appendChild(w);
+  }
+  function open(){ openSwarModal(s); }
+  row.addEventListener("click", open);
+  row.addEventListener("keydown", function(ev){ if(ev.key==="Enter"||ev.key===" "){ ev.preventDefault(); open(); } });
+  return row;
+}
+var swarModalCur=null;
+function openSwarModal(s){
+  swarModalCur=s;
+  $("swarTitle").textContent=s.name;
+  $("swarModalSub").textContent=s.west+" · "+fmtHz(swarFreq(s.off))+
+    (s.off===12 ? " (high octave)" : " (middle octave)");
+  var dia=$("swarDia"); dia.innerHTML="";
+  dia.appendChild(bigDiagram(FING[s.key], s.key==="Pa"));
+  $("swarHow").textContent=SWAR_HOW[s.key];
+  var oct=$("swarOctNote");
+  if(MANDRA_KEYS.indexOf(s.key)>=0){
+    var lo=swarFreq(s.off)/2;
+    oct.textContent="Same fingering, softer air → sounds low (Mandra, "+fmtHz(lo)+
+      "). Stronger air → sounds middle (Madhya, "+fmtHz(swarFreq(s.off))+").";
+    oct.hidden=false;
+    $("swarRefLow").hidden=false;
+  }else if(s.key==="Sa2"){
+    oct.textContent="Blow harder (but stay relaxed) to reach the higher octave.";
+    oct.hidden=false;
+    $("swarRefLow").hidden=true;
+  }else{
+    oct.hidden=true;
+    $("swarRefLow").hidden=true;
+  }
+  var warn=$("swarPaWarn");
+  if(s.key==="Pa"){
+    warn.textContent="⚠ Right-hand ring finger. Lay the flat pad across the hole, do not use the fingertip.";
+    warn.hidden=false;
+  }else warn.hidden=true;
+  $("modalSwar").classList.add("open");
+}
+$("swarRefMid").addEventListener("click", function(){
+  if(swarModalCur) playTone(swarFreq(swarModalCur.off));
+});
+$("swarRefLow").addEventListener("click", function(){
+  if(swarModalCur) playTone(swarFreq(swarModalCur.off)/2);
+});
+$("closeSwar").addEventListener("click", function(){ $("modalSwar").classList.remove("open"); });
+$("modalSwar").addEventListener("click", function(e){
+  if(e.target===$("modalSwar")) $("modalSwar").classList.remove("open");
+});
+
+/* ================= set Sa ================= */
+function updateSaNowLine(){
+  var p=profiles[activeProfile];
+  var label = activeProfile==="pvc" ? "PVC Radhe C" : "Wooden C";
+  $("saNowLine").textContent=label+" — Sa is "+p.saNote+" ("+fmtHz(p.saFreq)+")";
+}
+function setProfileSa(freq, note){
+  profiles[activeProfile]={saFreq:freq, saNote:note};
+  saveProfiles();
+  updateSaNowLine();
+  renderLearn();
+  if(practice.mode) rebuildStatic();
+  droneRetune();
+  toast("Sa locked at "+fmtHz(freq));
+}
+function openSaModal(){
+  if(!micOn) startMic();
+  updateSaNowLine();
+  /* dropdown */
+  var sel=$("saNoteSel"); sel.innerHTML="";
+  WESTERN.forEach(function(w,i){
+    var o=document.createElement("option");
+    o.value=String(i); o.textContent=w;
+    sel.appendChild(o);
+  });
+  sel.value=String(WESTERN.indexOf(profiles[activeProfile].saNote));
+  if(sel.value<0) sel.value="0";
+  updateSaNoteFreq();
+  $("saLockBtn").disabled=true;
+  $("modalSa").classList.add("open");
+}
+function updateSaNoteFreq(){
+  var i=+$("saNoteSel").value;
+  $("saNoteFreq").textContent=WESTERN[i]+" = "+fmtHz(523.25*Math.pow(2,i/12))+" (default)";
+}
+$("saNoteSel").addEventListener("change", function(){
+  var i=+$("saNoteSel").value;
+  updateSaNoteFreq();
+  setProfileSa(523.25*Math.pow(2,i/12), WESTERN[i]);
+  $("modalSa").classList.remove("open");
+});
+$("saLockBtn").addEventListener("click", function(){
+  if(disp.status==="note" && disp.stab>=0.6){
+    setProfileSa(disp.freq, disp.west);
+    $("modalSa").classList.remove("open");
+  }
+});
+$("closeSa").addEventListener("click", function(){ $("modalSa").classList.remove("open"); });
+$("modalSa").addEventListener("click", function(e){
+  if(e.target===$("modalSa")) $("modalSa").classList.remove("open");
+});
+function refreshTuneChips(){
+  $("tuneJust").classList.toggle("active", settings.tuning==="just");
+  $("tuneEt").classList.toggle("active", settings.tuning==="et");
+}
+function updateTuneModeLine(){
+  var l=$("tuneModeLine");
+  if(l) l.textContent = settings.tuning==="just"
+    ? "Note spacing: Pure (drone-like). Change it in Set Sa."
+    : "Note spacing: Piano-style. Change it in Set Sa.";
+}
+function afterTuningChange(){
+  updateTuneModeLine(); renderLearn();
+  if(practice.mode) rebuildStatic();
+  toast(settings.tuning==="just" ? "Pure note spacing (drone-like)" : "Piano-style note spacing");
+}
+$("tuneJust").addEventListener("click", function(){
+  if(settings.tuning==="just") return;
+  settings.tuning="just"; saveSettings(); refreshTuneChips(); afterTuningChange();
+});
+$("tuneEt").addEventListener("click", function(){
+  if(settings.tuning==="et") return;
+  settings.tuning="et"; saveSettings(); refreshTuneChips(); afterTuningChange();
+});
+function updateSaModalLive(){
+  var f=$("saLiveFreq"), h=$("saLiveHint"), b=$("saLockBtn");
+  if(!micOn){
+    f.textContent="—";
+    h.textContent="Tap “Mic: Off” up top, then play Sa (3 holes closed) the way you normally play — relaxed, not forced — for about 2 seconds.";
+    b.disabled=true;
+    return;
+  }
+  if(disp.status==="note"){
+    f.textContent=disp.freq.toFixed(1)+" Hz";
+    if(disp.stab>=0.6){
+      h.textContent="Steady! Tap the button to lock Sa here.";
+      b.disabled=false;
+    }else{
+      h.textContent="Keep playing Sa steadily… ("+Math.round(disp.stab*100)+"% steady)";
+      b.disabled=true;
+    }
+  }else if(disp.status==="noTone"){
+    f.textContent="—";
+    h.textContent="No clear tone - check your hole seal.";
+    b.disabled=true;
+  }else{
+    f.textContent="—";
+    h.textContent="Waiting for sound… play Sa (3 holes closed) the way you normally play, for about 2 seconds.";
+    b.disabled=true;
+  }
+}
+
+/* ================= practice ================= */
+var practice={
+  mode:null, loop:"pa", targetOct:0, singleKey:"Ga",
+  targets:[], idx:0, hold:0,
+  mIdx:0, goal:settings.goal,
+  sargamSel:0, sargamSeq:null, sIdx:0, running:false, done:false,
+  lastT:0
+};
+function nameOf(key, oct){
+  var s=SWARS.find(function(w){ return w.key===key; });
+  return (key==="Sa" && oct>=1) ? "Sa'" : s.name;
+}
+function offOf(key){
+  var s=SWARS.find(function(w){ return w.key===key; });
+  return s.off;
+}
+function targetFreq(t){ return saFreq()*Math.pow(2, (targetCents(offOf(t.key)) + t.oct*1200)/1200); }
+function buildTargetSeq(){
+  if(practice.loop==="pa") return [{key:"Pa", oct:practice.targetOct}];
+  if(practice.loop==="sapa") return [{key:"Sa",oct:0},{key:"Pa",oct:0},{key:"Sa",oct:0},{key:"Pa",oct:0}];
+  var oct=0;
+  if(practice.singleKey==="Sa'") oct=1;
+  else if(MANDRA_KEYS.indexOf(practice.singleKey)>=0) oct=practice.targetOct;
+  var k = practice.singleKey==="Sa'" ? "Sa" : practice.singleKey;
+  return [{key:k, oct:oct}];
+}
+function currentTarget(){
+  if(practice.mode==="target") return practice.targets[practice.idx];
+  if(practice.mode==="mandra") return MANDRA_SEQ[practice.mIdx];
+  if(practice.mode==="sargam" && practice.sargamSeq) return practice.sargamSeq[practice.sIdx];
+  return null;
+}
+function enterMode(mode){
+  if(!micOn) startMic();
+  practice.mode=mode;
+  practice.hold=0; practice.lastT=performance.now();
+  if(mode==="target"){
+    practice.targets=buildTargetSeq(); practice.idx=0;
+  }
+  if(mode==="mandra"){ practice.mIdx=0; }
+  if(mode==="sargam"){ practice.running=false; practice.done=false; practice.sIdx=0; practice.sargamSeq=null; }
+  $("practicePicker").hidden=true;
+  $("practiceRun").hidden=false;
+  $("modeTitle").textContent = mode==="target" ? "Target Swar" : (mode==="mandra" ? "Mandra Practice" : "Sargam Trainer");
+  buildModeControls();
+  rebuildStatic();
+  reqWake();
+}
+function exitMode(){
+  practice.mode=null; metroStop();
+  $("practicePicker").hidden=false;
+  $("practiceRun").hidden=true;
+  relWake();
+}
+function resetTargets(){
+  practice.targets=buildTargetSeq();
+  practice.idx=0; practice.hold=0;
+  buildModeControls(); rebuildStatic();
+}
+function octChipsNeeded(){
+  if(practice.loop==="pa") return true;
+  if(practice.loop==="single" && MANDRA_KEYS.indexOf(practice.singleKey)>=0) return true;
+  return false;
+}
+function buildModeControls(){
+  var host=$("modeControls");
+  if(practice.mode==="target"){
+    host.innerHTML=
+      '<div class="chip-row">'+
+        '<button class="chip'+(practice.loop==="pa"?" active":"")+'" data-act="loop" data-loop="pa">Pa only</button>'+
+        '<button class="chip'+(practice.loop==="sapa"?" active":"")+'" data-act="loop" data-loop="sapa">Sa–Pa–Sa–Pa</button>'+
+        '<button class="chip'+(practice.loop==="single"?" active":"")+'" data-act="pick">Choose a swar</button>'+
+      '</div>'+
+      (octChipsNeeded() ?
+        '<div class="chip-row"><span class="dim octave-label">Octave:</span>'+
+        '<button class="chip'+(practice.targetOct===-1?" active":"")+'" data-act="oct" data-oct="-1">Mandra (low)</button>'+
+        '<button class="chip'+(practice.targetOct===0?" active":"")+'" data-act="oct" data-oct="0">Madhya (middle)</button></div>' : "")+
+      '<div id="seqLine" class="seq-line"></div>';
+    renderSeqLine();
+  }else if(practice.mode==="mandra"){
+    host.innerHTML=
+      '<div class="chip-row">'+
+        '<button class="chip'+(practice.mIdx===0?" active":"")+'" data-act="mnote" data-mi="0">Pa</button>'+
+        '<button class="chip'+(practice.mIdx===1?" active":"")+'" data-act="mnote" data-mi="1">Dha</button>'+
+        '<button class="chip'+(practice.mIdx===2?" active":"")+'" data-act="mnote" data-mi="2">Ni</button>'+
+      '</div>'+
+      '<div class="chip-row"><span class="dim octave-label">Hold goal:</span>'+
+        [3,5,8,10].map(function(g){
+          return '<button class="chip'+(practice.goal===g?" active":"")+'" data-act="goal" data-g="'+g+'">'+g+' s</button>';
+        }).join("")+
+      '</div>'+
+      '<div class="tip">Low notes need soft, slow air. Relax and let the note come.</div>'+
+      '<div class="chip-row"><button class="chip" data-act="mnext">Next note ›</button></div>';
+  }else{
+    host.innerHTML=
+      '<div class="chip-row">'+
+        SARGAMS.map(function(s,i){
+          return '<button class="chip'+(practice.sargamSel===i?" active":"")+'" data-act="sargam" data-si="'+i+'">'+s.name+'</button>';
+        }).join("")+
+      '</div>'+
+      '<div class="bpm-row"><span class="dim">Metronome</span>'+
+        '<input id="bpmSlider" type="range" min="40" max="120" step="1" value="'+settings.bpm+'">'+
+        '<b id="bpmVal">'+settings.bpm+'</b></div>'+
+      '<div class="chip-row">'+
+        '<button class="btn btn-primary" data-act="start">'+(practice.running?"Restart":"Start")+'</button>'+
+        '<button class="btn" data-act="stop">Stop</button>'+
+      '</div>'+
+      '<div class="metro-row"><span id="metroDot" class="metro-dot"></span><span id="sargamProgress" class="dim"></span></div>';
+    $("bpmSlider").addEventListener("input", function(e){
+      settings.bpm=+e.target.value; $("bpmVal").textContent=settings.bpm; saveSettings();
+    });
+    updateSargamProgress();
+  }
+}
+$("modeControls").addEventListener("click", function(e){
+  var b=e.target.closest("[data-act]"); if(!b) return;
+  var act=b.getAttribute("data-act");
+  if(act==="loop"){ practice.loop=b.getAttribute("data-loop"); resetTargets(); }
+  else if(act==="oct"){ practice.targetOct=+b.getAttribute("data-oct"); resetTargets(); }
+  else if(act==="pick"){ openPick(); }
+  else if(act==="mnote"){ practice.mIdx=+b.getAttribute("data-mi"); practice.hold=0; buildModeControls(); rebuildStatic(); }
+  else if(act==="mnext"){ practice.mIdx=(practice.mIdx+1)%MANDRA_SEQ.length; practice.hold=0; buildModeControls(); rebuildStatic(); }
+  else if(act==="goal"){ practice.goal=+b.getAttribute("data-g"); settings.goal=practice.goal; saveSettings(); buildModeControls(); rebuildStatic(); }
+  else if(act==="sargam"){
+    practice.sargamSel=+b.getAttribute("data-si");
+    practice.running=false; metroStop(); practice.done=false; practice.sIdx=0; practice.sargamSeq=null;
+    practice.hold=0; buildModeControls(); rebuildStatic();
+  }
+  else if(act==="start"){ startSargam(); }
+  else if(act==="stop"){ practice.running=false; practice.done=false; practice.sargamSeq=null; metroStop(); buildModeControls(); rebuildStatic(); }
+});
+function renderSeqLine(){
+  var host=$("seqLine"); if(!host) return;
+  if(practice.loop==="sapa"){
+    var names=practice.targets.map(function(t){ return nameOf(t.key,t.oct); });
+    host.innerHTML=names.map(function(n,i){
+      return i===practice.idx ? '<b class="cur">'+n+'</b>' : '<span>'+n+'</span>';
+    }).join(' <span class="dim">→</span> ');
+  }else if(practice.loop==="pa"){
+    host.textContent="Pa again and again — every lock counts.";
+  }else{
+    var t=practice.targets[0];
+    host.textContent="Practicing "+nameOf(t.key,t.oct)+" — it repeats after each lock.";
+  }
+}
+function openPick(){
+  var g=$("pickGrid"); g.innerHTML="";
+  SWARS.forEach(function(s){
+    var b=el("button","chip", s.name);
+    b.type="button";
+    b.addEventListener("click", function(){
+      practice.singleKey=s.key;
+      practice.loop="single";
+      $("modalPick").classList.remove("open");
+      resetTargets();
+    });
+    g.appendChild(b);
+  });
+  var b2=el("button","chip","Sa'");
+  b2.type="button";
+  b2.addEventListener("click", function(){
+    practice.singleKey="Sa'"; practice.loop="single";
+    $("modalPick").classList.remove("open");
+    resetTargets();
+  });
+  g.appendChild(b2);
+  $("modalPick").classList.add("open");
+}
+$("closePick").addEventListener("click", function(){ $("modalPick").classList.remove("open"); });
+$("modalPick").addEventListener("click", function(e){
+  if(e.target===$("modalPick")) $("modalPick").classList.remove("open");
+});
+
+function startSargam(){
+  practice.done=false;
+  practice.sargamSeq=SARGAMS[practice.sargamSel].seq.map(function(p){ return {key:p[0], oct:p[1]}; });
+  practice.sIdx=0; practice.hold=0; practice.running=true;
+  metroStart();
+  buildModeControls(); rebuildStatic();
+}
+function updateSargamProgress(){
+  var sp=$("sargamProgress"); if(!sp) return;
+  if(practice.running && practice.sargamSeq){
+    sp.textContent="Note "+(practice.sIdx+1)+" of "+practice.sargamSeq.length;
+  }else if(practice.done){
+    sp.textContent="Finished!";
+  }else{
+    sp.textContent="";
+  }
+}
+function rebuildStatic(){
+  var tgt=currentTarget();
+  if(!tgt){
+    if(practice.mode==="sargam"){
+      $("targetLabel").textContent = practice.done ? "FINISHED" : "READY";
+      $("targetBig").textContent = practice.done ? "✓" : "♪";
+      $("targetNote").textContent = practice.done ? "Well played." : "Pick a sargam above, then tap Start.";
+      $("holdGoal").textContent="";
+      $("holdVal").textContent="0.0";
+      $("holdBarFill").style.width="0%";
+      $("bestLine").textContent="";
+      updateSargamProgress();
+    }
+    return;
+  }
+  var s=SWARS.find(function(w){ return w.key===tgt.key; });
+  $("targetLabel").textContent="NOW PLAY";
+  $("targetBig").textContent=nameOf(tgt.key, tgt.oct);
+  $("targetNote").textContent=s.west+" · "+octName(tgt.oct)+" · "+fmtHz(targetFreq(tgt));
+  $("holdGoal").textContent =
+    practice.mode==="target" ? "Hold it steady for 2 seconds to lock" :
+    practice.mode==="mandra" ? "Hold it steady for "+practice.goal+" seconds" :
+    "Hold it about a second, then the next note comes";
+  updateSargamProgress();
+  if(practice.mode==="target") renderSeqLine();
+}
+function succeed(small){
+  if(small) playBlip(); else playSuccess();
+  var c=$("targetCard");
+  c.classList.add("success");
+  setTimeout(function(){ c.classList.remove("success"); }, 800);
+}
+function endHold(){
+  if(practice.hold>0.5){
+    var tgt=currentTarget();
+    if(tgt){
+      var k=tgt.key+"|"+tgt.oct;
+      stats.best[k]=Math.max(stats.best[k]||0, practice.hold);
+      lsSet("bp.stats", stats);
+      flushStats();
+    }
+  }
+  practice.hold=0;
+}
+function practiceTick(now){
+  if(!practice.mode) return;
+  var dt = practice.lastT ? Math.min(0.3,(now-practice.lastT)/1000) : 0;
+  practice.lastT=now;
+  if(disp.status!=="note"){ endHold(); renderPractice(now); return; }
+  var tgt=currentTarget();
+  if(!tgt){ renderPractice(now); return; }
+  var match = disp.swar.key===tgt.key && disp.oct===tgt.oct && Math.abs(disp.dev)<=25;
+  if(match){
+    practice.hold+=dt;
+    if(practice.mode==="target" && practice.hold>=2){
+      succeed(false); endHold();
+      practice.idx=(practice.idx+1)%practice.targets.length;
+      rebuildStatic();
+    }else if(practice.mode==="mandra" && practice.hold>=practice.goal){
+      succeed(false); endHold();
+      practice.mIdx=(practice.mIdx+1)%MANDRA_SEQ.length;
+      buildModeControls(); rebuildStatic();
+    }else if(practice.mode==="sargam" && practice.hold>=0.8){
+      succeed(true); endHold();
+      practice.sIdx++;
+      if(practice.sIdx>=practice.sargamSeq.length){
+        practice.done=true; practice.running=false; metroStop(); playSuccess();
+        buildModeControls(); rebuildStatic();
+      }else{
+        rebuildStatic();
+      }
+    }
+  }else{
+    endHold();
+  }
+  renderPractice(now);
+}
+function renderPractice(now){
+  var tgt=currentTarget();
+  if(!tgt) return;
+  var match = disp.status==="note" && disp.swar.key===tgt.key && disp.oct===tgt.oct && Math.abs(disp.dev)<=25;
+  var big=$("targetBig");
+  big.className="target-big"+(match?" z-green":"");
+  $("holdVal").textContent=practice.hold.toFixed(1);
+  var need = practice.mode==="target" ? 2 : (practice.mode==="mandra" ? practice.goal : 0.8);
+  $("holdBarFill").style.width=clamp(practice.hold/need*100,0,100)+"%";
+  var best=stats.best[tgt.key+"|"+tgt.oct]||0;
+  $("bestLine").textContent = best>0 ? "Best hold: "+best.toFixed(1)+"s" : "";
+  var chips=$("goalChips").children;
+  for(var i=0;i<chips.length;i++){
+    var g=+chips[i].getAttribute("data-g");
+    chips[i].classList.toggle("lit", practice.hold>=g);
+  }
+  var hint=$("practiceHint");
+  if(!micOn) hint.textContent="Mic is off — tap the Mic button up top.";
+  else if(disp.status==="wait") hint.textContent="Waiting for sound…";
+  else if(disp.status==="noTone") hint.textContent="No clear tone - check your hole seal.";
+  else if(match) hint.textContent="Steady… keep holding.";
+  else hint.textContent=COACH[tgt.key]||"Play the note shown above.";
+}
+/* goal chips (3/5/8/10) — built once, shared by all modes */
+function buildGoalChips(){
+  var host=$("goalChips"); host.innerHTML="";
+  [3,5,8,10].forEach(function(g){
+    var b=el("button","chip", g+"s");
+    b.type="button";
+    b.setAttribute("data-g", String(g));
+    b.addEventListener("click", function(){
+      practice.goal=g; settings.goal=g; saveSettings();
+      if(practice.mode==="mandra") buildModeControls();
+      if(practice.mode) rebuildStatic();
+    });
+    host.appendChild(b);
+  });
+}
+$("refToneBtn").addEventListener("click", function(){
+  var tgt=currentTarget();
+  if(tgt) playTone(targetFreq(tgt));
+});
+$("backBtn").addEventListener("click", exitMode);
+Array.prototype.forEach.call(document.querySelectorAll(".mode-btn"), function(b){
+  b.addEventListener("click", function(){ enterMode(b.getAttribute("data-mode")); });
+});
+
+/* ================= progress render ================= */
+function renderProgress(){
+  var pa=swarAcc7("Pa");
+  var bar=$("paAccBar"), val=$("paAccVal");
+  if(pa.t>0.5){
+    var pct=Math.round(pa.g/pa.t*100);
+    bar.style.width=pct+"%";
+    bar.className = pct>=70 ? "" : (pct>=40 ? "yellow" : "red");
+    val.textContent=pct+"%";
+    $("paHeard").textContent="Heard Pa for "+Math.round(pa.t)+" s in the last 7 days.";
+  }else{
+    bar.style.width="0%"; bar.className="none"; val.textContent="—";
+    $("paHeard").textContent="Play Pa to start tracking.";
+  }
+  var bb=bestHoldFor("Pa");
+  var bLabel=bb>0 ? bb.toFixed(1)+" s" : "—";
+  var bOct=null;
+  for(var k in stats.best){
+    if(k.indexOf("Pa|")===0 && stats.best[k]===bb) bOct=+k.split("|")[1];
+  }
+  if(bb>0 && bOct!=null) bLabel+=" ("+octName(bOct)+")";
+  $("paBest").textContent=bLabel;
+  $("statMin").textContent=totalMinutes();
+  $("statStreak").textContent=calcStreak()+(calcStreak()===1?" day":" days");
+  var host=$("swarBars"); host.innerHTML="";
+  var list=SWARS.slice();
+  list.push({key:"Sa2", name:"Sa'"});
+  list.forEach(function(s){
+    var acc=swarAcc7(s.key);
+    var row=el("div","prow");
+    row.appendChild(el("span","pname", s.name));
+    var pb=el("div","pbar");
+    var fill=el("div");
+    if(acc.t>0.5){
+      var p=Math.round(acc.g/acc.t*100);
+      fill.style.width=p+"%";
+      fill.className = p>=70 ? "" : (p>=40 ? "yellow" : "red");
+    }else{
+      fill.style.width="0%"; fill.className="none";
+    }
+    pb.appendChild(fill);
+    row.appendChild(pb);
+    row.appendChild(el("span","pval", acc.t>0.5 ? Math.round(acc.g/acc.t*100)+"%" : "—"));
+    host.appendChild(row);
+  });
+}
+$("clearBtn").addEventListener("click", function(){
+  if(confirm("This deletes all your saved progress, best holds and Sa settings. Are you sure?")){
+    lsDel("bp.stats"); lsDel("bp.profiles"); lsDel("bp.active"); lsDel("bp.settings");
+    stats={days:{}, best:{}};
+    profiles={ pvc:{saFreq:523.25, saNote:"C"}, wood:{saFreq:523.25, saNote:"C"} };
+    activeProfile="pvc";
+    settings={bpm:60, droneVol:35, goal:3};
+    saveProfiles(); saveSettings();
+    $("profileSel").value="pvc";
+    $("droneVol").value=settings.droneVol;
+    if(drone.on) droneStop();
+    practice.goal=settings.goal;
+    updateSaNowLine(); renderLearn(); renderProgress();
+    if(practice.mode) rebuildStatic();
+    toast("All data cleared.");
+  }
+});
+
+/* ================= wake lock ================= */
+var wakeLock=null;
+async function reqWake(){
+  try{
+    if("wakeLock" in navigator && navigator.wakeLock && navigator.wakeLock.request){
+      wakeLock=await navigator.wakeLock.request("screen");
+    }
+  }catch(e){}
+}
+function relWake(){
+  try{ if(wakeLock) wakeLock.release(); }catch(e){}
+  wakeLock=null;
+}
+
+/* ================= tabs & header events ================= */
+Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(b){
+  b.addEventListener("click", function(){
+    currentTab=b.getAttribute("data-tab");
+    Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(x){ x.classList.toggle("active", x===b); });
+    $("sec-listen").hidden = currentTab!=="listen";
+    $("sec-learn").hidden = currentTab!=="learn";
+    $("sec-practice").hidden = currentTab!=="practice";
+    $("sec-progress").hidden = currentTab!=="progress";
+    if(currentTab==="listen") sizeGraph();
+    if(currentTab==="progress") renderProgress();
+  });
+});
+$("micBtn").addEventListener("click", function(){
+  if(micOn) stopMic(); else startMic();
+});
+$("setSaBtn").addEventListener("click", openSaModal);
+$("profileSel").value=activeProfile;
+$("profileSel").addEventListener("change", function(){
+  activeProfile=$("profileSel").value;
+  lsSet("bp.active", activeProfile);
+  updateSaNowLine(); renderLearn();
+  if(practice.mode) rebuildStatic();
+  droneRetune();
+  toast("Switched to "+(activeProfile==="pvc"?"PVC Radhe C":"Wooden C"));
+});
+$("droneBtn").addEventListener("click", function(){
+  if(drone.on) droneStop(); else droneStart();
+});
+$("droneVol").value=settings.droneVol;
+$("droneVol").addEventListener("input", function(e){
+  settings.droneVol=+e.target.value; saveSettings();
+  if(drone.gain) drone.gain.gain.value=(settings.droneVol/100)*0.14;
+});
+
+/* ================= main loop & lifecycle ================= */
+function loop(now){
+  requestAnimationFrame(loop);
+  if(micOn && analyser && now-lastAnalysis>=45){
+    lastAnalysis=now;
+    analyse(now);
+  }
+  if($("modalSa").classList.contains("open")) updateSaModalLive();
+}
+document.addEventListener("visibilitychange", function(){
+  if(document.hidden){ flushStats(); if(metro.on) metroStop(); }
+});
+window.addEventListener("beforeunload", flushStats);
+window.addEventListener("resize", function(){ sizeGraph(); if(currentTab==="listen") drawGraph(performance.now()); });
+
+/* ================= init ================= */
+updateMicBtn();
+updateSaNowLine();
+renderLearn();
+buildGoalChips();
+refreshTuneChips();
+updateTuneModeLine();
+sizeGraph();
+renderTuner(performance.now());
+requestAnimationFrame(loop);
+
+})();
+</script>
+</body>
+</html>
