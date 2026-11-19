@@ -183,6 +183,17 @@ nav#tabs button.active{color:var(--accent)}
 .metro-dot{width:16px; height:16px; border-radius:50%; background:#1a2230; border:2px solid var(--line); display:inline-block; flex:none}
 .metro-dot.on{background:var(--accent); border-color:var(--accent)}
 .target-card.success{border-color:var(--green); box-shadow:0 0 0 3px rgba(62,224,137,.3)}
+.target-card.miss{border-color:var(--red); box-shadow:0 0 0 3px rgba(255,122,122,.25)}
+.beat-dot{width:14px; height:14px; border-radius:50%; background:#1a2230; border:2px solid var(--line); display:inline-block; flex:none}
+.beat-dot.on{background:var(--yellow); border-color:var(--yellow)}
+.quiz-opt{
+  display:block; width:100%; text-align:left; margin-bottom:8px; min-height:52px;
+  border-radius:14px; border:1px solid var(--line); background:#161d27; color:var(--text);
+  font-size:17px; font-weight:600; cursor:pointer; padding:10px 14px;
+}
+.quiz-opt.correct{background:var(--green); color:#04220f; border-color:transparent}
+.quiz-opt.wrong{background:rgba(255,122,122,.15); border-color:var(--red); color:var(--red)}
+.quiz-opt[disabled]{opacity:.75; cursor:default}
 
 /* ---------- progress ---------- */
 .spot{display:flex; flex-direction:column; gap:8px}
@@ -288,6 +299,8 @@ nav#tabs button.active{color:var(--accent)}
         <span>Low Pa, Dha and Ni with a hold timer. Your main practice.</span></button>
       <button class="mode-btn" data-mode="sargam">Sargam Trainer
         <span>Play note by note, with a metronome.</span></button>
+      <button class="mode-btn" data-mode="rhythm">Rhythm Game
+        <span>Listen first, then play along with the beat for a score.</span></button>
     </div>
     <div id="practiceRun" hidden>
       <div class="run-top">
@@ -309,9 +322,22 @@ nav#tabs button.active{color:var(--accent)}
     </div>
   </section>
 
-  <!-- ============ 4. PROGRESS ============ -->
+  <!-- ============ 4. QUIZ ============ -->
+  <section id="sec-quiz" hidden>
+    <h2>Flute quiz</h2>
+    <p class="dim" style="margin-top:0">Small questions about swars, fingers and air. Wrong answers are fine — they teach. Every correct answer adds XP.</p>
+    <div class="card" id="quizCard"></div>
+  </section>
+
+  <!-- ============ 5. PROGRESS ============ -->
   <section id="sec-progress" hidden>
     <h2>My progress</h2>
+    <div class="card">
+      <div style="font-weight:800">Level <span id="lvlNum">1</span> — <span id="lvlName">First sounds</span></div>
+      <div class="pbar" style="margin-top:8px"><div id="xpFill"></div></div>
+      <div class="small dim" id="xpLine" style="margin-top:6px"></div>
+      <div class="small dim" style="margin-top:4px">XP comes from practice seconds, quiz answers and rhythm scores.</div>
+    </div>
     <div class="card spot">
       <div style="font-size:18px; font-weight:800">Pa — your main note</div>
       <div class="small dim">Pa is tracked on its own because it is the tricky one.</div>
@@ -327,6 +353,10 @@ nav#tabs button.active{color:var(--accent)}
       <div class="small dim" style="margin-top:8px">A day counts when you play for 1 minute or more.</div>
     </div>
     <div class="card">
+      <div style="font-weight:800; margin-bottom:8px">Rhythm game best</div>
+      <div id="rhythmBests"></div>
+    </div>
+    <div class="card">
       <div style="font-weight:800; margin-bottom:8px">Last 7 days — each swar</div>
       <div id="swarBars"></div>
       <div class="small dim" style="margin-top:6px">Green = mostly in tune. Red = needs work. “—” = not played yet.</div>
@@ -340,6 +370,7 @@ nav#tabs button.active{color:var(--accent)}
   <button class="tab active" data-tab="listen"><span class="ticon">🎧</span>Listen</button>
   <button class="tab" data-tab="learn"><span class="ticon">📖</span>Learn</button>
   <button class="tab" data-tab="practice"><span class="ticon">🎯</span>Practice</button>
+  <button class="tab" data-tab="quiz"><span class="ticon">🧠</span>Quiz</button>
   <button class="tab" data-tab="progress"><span class="ticon">📈</span>Progress</button>
 </nav>
 
@@ -497,6 +528,9 @@ if(settings.tuning!=="just" && settings.tuning!=="et") settings.tuning="just";
 var stats = lsGet("bp.stats", null) || {days:{}, best:{}};
 if(!stats.days) stats.days = {};
 if(!stats.best) stats.best = {};
+if(!stats.rhythm) stats.rhythm = {};
+if(!stats.quizBest) stats.quizBest = 0;
+if(!stats.bonusXP) stats.bonusXP = {quiz:0, rhythm:0};
 
 function saveProfiles(){ lsSet("bp.profiles", profiles); }
 function saveSettings(){ lsSet("bp.settings", settings); }
@@ -577,9 +611,9 @@ function droneRetune(){ if(drone.on) droneStart(); }
 
 /* ---- metronome ---- */
 var metro={on:false, next:0, beat:0, iv:null};
-function scheduleClick(time){
+function scheduleClick(time, idx){
   var o=actx.createOscillator(); o.type="sine";
-  o.frequency.value = (metro.beat%4===0)?1050:750;
+  o.frequency.value = (idx%4===0)?1050:750;
   var g=actx.createGain();
   g.gain.setValueAtTime(0.0001, time);
   g.gain.exponentialRampToValueAtTime(0.16, time+0.005);
@@ -587,10 +621,15 @@ function scheduleClick(time){
   o.connect(g); g.connect(actx.destination);
   o.start(time); o.stop(time+0.1);
 }
-function pulseDot(){
-  var d=$("metroDot"); if(!d) return;
-  d.classList.add("on");
-  setTimeout(function(){ d.classList.remove("on"); }, 110);
+function pulseDot(idx){
+  if(idx==null) idx=0;
+  var dots=document.querySelectorAll(".beat-dot");
+  if(dots.length){
+    var d=dots[idx%4];
+    if(d){ d.classList.add("on"); setTimeout(function(){ d.classList.remove("on"); },100); }
+  }
+  var s=$("metroDot");
+  if(s){ s.classList.add("on"); setTimeout(function(){ s.classList.remove("on"); },110); }
 }
 function metroStart(){
   if(!ensureAudio()) return;
@@ -598,9 +637,11 @@ function metroStart(){
   metro.on=true; metro.beat=0; metro.next=actx.currentTime+0.12;
   metro.iv=setInterval(function(){
     while(metro.next < actx.currentTime + 0.18){
-      scheduleClick(metro.next);
-      var delay=Math.max(0,(metro.next-actx.currentTime)*1000);
-      setTimeout(pulseDot, delay);
+      (function(bIdx, when){
+        scheduleClick(when, bIdx);
+        var delay=Math.max(0,(when-actx.currentTime)*1000);
+        setTimeout(function(){ pulseDot(bIdx); }, delay);
+      })(metro.beat, metro.next);
       metro.next += 60/settings.bpm;
       metro.beat++;
     }
@@ -1243,6 +1284,9 @@ var practice={
   targets:[], idx:0, hold:0,
   mIdx:0, goal:settings.goal,
   sargamSel:0, sargamSeq:null, sIdx:0, running:false, done:false,
+  rhythmSel:0, beatsPerNote:2, waitforme:false,
+  rIdx:0, rHeldMs:0, rDevSum:0, rDevN:0, rResults:[], rScore:0, rMax:0, rStars:0,
+  rStart:0, countStart:0,
   lastT:0
 };
 function nameOf(key, oct){
@@ -1267,6 +1311,7 @@ function currentTarget(){
   if(practice.mode==="target") return practice.targets[practice.idx];
   if(practice.mode==="mandra") return MANDRA_SEQ[practice.mIdx];
   if(practice.mode==="sargam" && practice.sargamSeq) return practice.sargamSeq[practice.sIdx];
+  if(practice.mode==="rhythm" && practice.running) return practice.targets[practice.rIdx];
   return null;
 }
 function enterMode(mode){
@@ -1278,15 +1323,16 @@ function enterMode(mode){
   }
   if(mode==="mandra"){ practice.mIdx=0; }
   if(mode==="sargam"){ practice.running=false; practice.done=false; practice.sIdx=0; practice.sargamSeq=null; }
+  if(mode==="rhythm"){ practice.running=false; practice.done=false; practice.rIdx=0; practice.rResults=[]; }
   $("practicePicker").hidden=true;
   $("practiceRun").hidden=false;
-  $("modeTitle").textContent = mode==="target" ? "Target Swar" : (mode==="mandra" ? "Mandra Practice" : "Sargam Trainer");
+  $("modeTitle").textContent = mode==="target" ? "Target Swar" : (mode==="mandra" ? "Mandra Practice" : (mode==="rhythm" ? "Rhythm Game" : "Sargam Trainer"));
   buildModeControls();
   rebuildStatic();
   reqWake();
 }
 function exitMode(){
-  practice.mode=null; metroStop();
+  practice.mode=null; metroStop(); stopDemo();
   $("practicePicker").hidden=false;
   $("practiceRun").hidden=true;
   relWake();
@@ -1330,6 +1376,30 @@ function buildModeControls(){
       '</div>'+
       '<div class="tip">Low notes need soft, slow air. Relax and let the note come.</div>'+
       '<div class="chip-row"><button class="chip" data-act="mnext">Next note ›</button></div>';
+  }else if(practice.mode==="rhythm"){
+    host.innerHTML=
+      '<div class="chip-row">'+
+        RHYTHMS.map(function(s,i){
+          return '<button class="chip'+(practice.rhythmSel===i?" active":"")+'" data-act="rhythm" data-ri="'+i+'">'+s.name+'</button>';
+        }).join("")+
+      '</div>'+
+      '<div class="bpm-row"><span class="dim">Tempo</span>'+
+        '<input id="bpmSlider" type="range" min="40" max="120" step="1" value="'+settings.bpm+'">'+
+        '<b id="bpmVal">'+settings.bpm+'</b></div>'+
+      '<div class="chip-row">'+
+        '<button class="chip" data-act="listen">🔊 Listen first</button>'+
+        '<button class="chip'+(practice.waitforme?" active":"")+'" data-act="beatmode">'+(practice.waitforme?"Waits for me":"Follows the beat")+'</button>'+
+      '</div>'+
+      '<div class="chip-row">'+
+        '<button class="btn btn-primary" data-act="start">'+(practice.running?"Stop":"Start")+'</button>'+
+      '</div>'+
+      '<div id="seqLine" class="seq-line"></div>'+
+      '<div class="metro-row"><span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span><span class="beat-dot"></span><span id="rhythmProgress" class="dim"></span></div>';
+    $("bpmSlider").addEventListener("input", function(e){
+      settings.bpm=+e.target.value; $("bpmVal").textContent=settings.bpm; saveSettings();
+    });
+    updateRhythmProgress();
+    renderSeqLine();
   }else{
     host.innerHTML=
       '<div class="chip-row">'+
@@ -1341,6 +1411,7 @@ function buildModeControls(){
         '<input id="bpmSlider" type="range" min="40" max="120" step="1" value="'+settings.bpm+'">'+
         '<b id="bpmVal">'+settings.bpm+'</b></div>'+
       '<div class="chip-row">'+
+        '<button class="chip" data-act="listen">🔊 Listen first</button>'+
         '<button class="btn btn-primary" data-act="start">'+(practice.running?"Restart":"Start")+'</button>'+
         '<button class="btn" data-act="stop">Stop</button>'+
       '</div>'+
@@ -1365,11 +1436,33 @@ $("modeControls").addEventListener("click", function(e){
     practice.running=false; metroStop(); practice.done=false; practice.sIdx=0; practice.sargamSeq=null;
     practice.hold=0; buildModeControls(); rebuildStatic();
   }
-  else if(act==="start"){ startSargam(); }
+  else if(act==="rhythm"){ practice.rhythmSel=+b.getAttribute("data-ri"); stopRhythm(); }
+  else if(act==="start"){
+    if(practice.mode==="rhythm"){ if(practice.running) stopRhythm(); else startRhythm(); }
+    else startSargam();
+  }
   else if(act==="stop"){ practice.running=false; practice.done=false; practice.sargamSeq=null; metroStop(); buildModeControls(); rebuildStatic(); }
+  else if(act==="listen"){
+    if(practice.running) return;
+    if(practice.mode==="rhythm"){
+      practice.targets=RHYTHMS[practice.rhythmSel].seq.map(function(p){ return {key:p.key, oct:p.oct}; });
+      practice.rIdx=0;
+      demoSeq(practice.targets, practice.beatsPerNote);
+    }else{
+      demoSeq(SARGAMS[practice.sargamSel].seq.map(function(p){ return {key:p[0], oct:p[1]}; }), practice.beatsPerNote);
+    }
+  }
+  else if(act==="beatmode"){ practice.waitforme=!practice.waitforme; buildModeControls(); }
 });
 function renderSeqLine(){
   var host=$("seqLine"); if(!host) return;
+  var cur = demo.active ? demo.hi : (practice.mode==="rhythm" ? practice.rIdx : practice.idx);
+  if(practice.mode==="rhythm"){
+    host.innerHTML=practice.targets.map(function(t,i){
+      return i===cur ? '<b class="cur">'+nameOf(t.key,t.oct)+'</b>' : '<span>'+nameOf(t.key,t.oct)+'</span>';
+    }).join(' <span class="dim">·</span> ');
+    return;
+  }
   if(practice.loop==="sapa"){
     var names=practice.targets.map(function(t){ return nameOf(t.key,t.oct); });
     host.innerHTML=names.map(function(n,i){
@@ -1411,6 +1504,7 @@ $("modalPick").addEventListener("click", function(e){
 });
 
 function startSargam(){
+  stopDemo();
   practice.done=false;
   practice.sargamSeq=SARGAMS[practice.sargamSel].seq.map(function(p){ return {key:p[0], oct:p[1]}; });
   practice.sIdx=0; practice.hold=0; practice.running=true;
@@ -1440,6 +1534,23 @@ function rebuildStatic(){
       $("bestLine").textContent="";
       updateSargamProgress();
     }
+    if(practice.mode==="rhythm"){
+      $("targetLabel").textContent = practice.done ? "FINISHED" : "READY";
+      $("targetBig").textContent = practice.done
+        ? "★".repeat(practice.rStars)+"☆".repeat(3-practice.rStars)
+        : "🥁";
+      $("targetNote").textContent = practice.done
+        ? "Score "+practice.rScore+" / "+practice.rMax
+        : "Listen first, then tap Start.";
+      $("holdGoal").textContent="";
+      $("holdVal").textContent="0.0";
+      $("holdBarFill").style.width="0%";
+      $("bestLine").textContent="";
+      $("practiceHint").textContent = practice.done
+        ? (practice.rStars>=2 ? "Great timing! Try a faster tempo next." : "Try again — listen first, then follow the beat.")
+        : "The dots above pulse with the beat.";
+      updateRhythmProgress();
+    }
     return;
   }
   var s=SWARS.find(function(w){ return w.key===tgt.key; });
@@ -1449,9 +1560,10 @@ function rebuildStatic(){
   $("holdGoal").textContent =
     practice.mode==="target" ? "Hold it steady for 2 seconds to lock" :
     practice.mode==="mandra" ? "Hold it steady for "+practice.goal+" seconds" :
+    practice.mode==="rhythm" ? (practice.waitforme ? "It waits for you — hold each note about a second" : "Hold each note as the beat passes it") :
     "Hold it about a second, then the next note comes";
   updateSargamProgress();
-  if(practice.mode==="target") renderSeqLine();
+  if(practice.mode==="target" || practice.mode==="rhythm") renderSeqLine();
 }
 function succeed(small){
   if(small) playBlip(); else playSuccess();
@@ -1475,6 +1587,7 @@ function practiceTick(now){
   if(!practice.mode) return;
   var dt = practice.lastT ? Math.min(0.3,(now-practice.lastT)/1000) : 0;
   practice.lastT=now;
+  if(practice.mode==="rhythm"){ rhythmTick(now, dt); return; }
   if(disp.status!=="note"){ endHold(); renderPractice(now); return; }
   var tgt=currentTarget();
   if(!tgt){ renderPractice(now); return; }
@@ -1505,6 +1618,8 @@ function practiceTick(now){
   renderPractice(now);
 }
 function renderPractice(now){
+  if(demo.active) return;
+  if(practice.mode==="rhythm"){ renderRhythm(now); return; }
   var tgt=currentTarget();
   if(!tgt) return;
   var match = disp.status==="note" && disp.swar.key===tgt.key && disp.oct===tgt.oct && Math.abs(disp.dev)<=25;
@@ -1551,8 +1666,290 @@ Array.prototype.forEach.call(document.querySelectorAll(".mode-btn"), function(b)
   b.addEventListener("click", function(){ enterMode(b.getAttribute("data-mode")); });
 });
 
+/* ================= Listen first (demo player) ================= */
+var demo={active:false, token:0, hi:-1};
+function stopDemo(){ demo.token++; demo.active=false; demo.hi=-1; }
+function scheduleTone(f, when, dur, vol){
+  var o=actx.createOscillator(); o.type="sine"; o.frequency.value=f;
+  var g=actx.createGain();
+  g.gain.setValueAtTime(0.0001, when);
+  g.gain.linearRampToValueAtTime(vol, when+0.03);
+  g.gain.setValueAtTime(vol, when+Math.max(0.08, dur-0.08));
+  g.gain.linearRampToValueAtTime(0.0001, when+dur);
+  o.connect(g); g.connect(actx.destination);
+  o.start(when); o.stop(when+dur+0.05);
+}
+function demoSeq(seq, beatsPerNote){
+  if(!ensureAudio()) return;
+  stopDemo(); metroStop();
+  demo.token++; var my=demo.token; demo.active=true;
+  var beatLen=60/settings.bpm, step=beatLen*beatsPerNote;
+  var t0=actx.currentTime+0.4;
+  seq.forEach(function(p,i){
+    var f=saFreq()*Math.pow(2,(targetCents(offOf(p.key))+p.oct*1200)/1200);
+    scheduleTone(f, t0+i*step, step*0.9, 0.16);
+    var delay=Math.max(0,(t0+i*step-actx.currentTime)*1000);
+    setTimeout(function(){
+      if(demo.token!==my) return;
+      demo.hi=i; pulseDot(i); renderSeqLine(); showDemoNote(p);
+    }, delay);
+  });
+  var endDelay=Math.max(0,(t0+seq.length*step-actx.currentTime)*1000);
+  setTimeout(function(){
+    if(demo.token!==my) return;
+    demo.active=false; demo.hi=-1;
+    renderSeqLine();
+    if(practice.mode) rebuildStatic();
+  }, endDelay);
+}
+function showDemoNote(p){
+  var big=$("targetBig");
+  if(big){ big.textContent=nameOf(p.key,p.oct); big.className="target-big"; }
+  var lb=$("targetLabel"); if(lb) lb.textContent="LISTEN";
+  var tn=$("targetNote");
+  if(tn) tn.textContent=SWARS.find(function(w){ return w.key===p.key; }).west+" · "+octName(p.oct)+" · "+fmtHz(saFreq()*Math.pow(2,(targetCents(offOf(p.key))+p.oct*1200)/1200));
+}
+
+/* ================= Rhythm Game ================= */
+var RHYTHMS=[
+  {name:"Sa Pa Sa Pa", seq:[{key:"Sa",oct:0},{key:"Pa",oct:0},{key:"Sa",oct:0},{key:"Pa",oct:0}]},
+  {name:"Ga Ma Pa", seq:[{key:"Ga",oct:0},{key:"Ma",oct:0},{key:"Pa",oct:0}]},
+  {name:"Sa Re Ga Re Sa", seq:[{key:"Sa",oct:0},{key:"Re",oct:0},{key:"Ga",oct:0},{key:"Re",oct:0},{key:"Sa",oct:0}]},
+  {name:"Pa Dha Ni Dha Pa", seq:[{key:"Pa",oct:0},{key:"Dha",oct:0},{key:"Ni",oct:0},{key:"Dha",oct:0},{key:"Pa",oct:0}]},
+  {name:"Full sargam up", seq:[{key:"Sa",oct:0},{key:"Re",oct:0},{key:"Ga",oct:0},{key:"Ma",oct:0},{key:"Pa",oct:0},{key:"Dha",oct:0},{key:"Ni",oct:0},{key:"Sa",oct:1}]}
+];
+function startRhythm(){
+  stopDemo();
+  practice.targets=RHYTHMS[practice.rhythmSel].seq.map(function(p){ return {key:p.key, oct:p.oct}; });
+  practice.rIdx=0; practice.rResults=[]; practice.rScore=0; practice.rMax=0; practice.rStars=0; practice.done=false;
+  practice.hold=0; practice.rHeldMs=0; practice.rDevSum=0; practice.rDevN=0;
+  practice.running=true;
+  var beatLen=60000/settings.bpm;
+  practice.countStart=performance.now();
+  practice.rStart=practice.countStart+4*beatLen;
+  metroStart();
+  buildModeControls(); rebuildStatic();
+}
+function stopRhythm(){
+  practice.running=false; practice.done=false; metroStop();
+  buildModeControls(); rebuildStatic();
+}
+function rhythmTick(now, dt){
+  if(!practice.running) return;
+  var beatLen=60000/settings.bpm, win=beatLen*practice.beatsPerNote;
+  if(now<practice.rStart){ renderPractice(now); return; }   /* count-in */
+  var t=now-practice.rStart;
+  var wi=Math.floor(t/win);
+  var tgt=practice.targets[practice.rIdx];
+  var m = disp.status==="note" && disp.swar.key===tgt.key && disp.oct===tgt.oct && Math.abs(disp.dev)<=25;
+  if(practice.waitforme){
+    if(m){
+      practice.rHeldMs+=dt*1000; practice.rDevSum+=Math.abs(disp.dev); practice.rDevN++;
+      if(practice.rHeldMs>=600) advanceRhythmNote(true);
+    }
+    if(practice.rIdx>=practice.targets.length) finishRhythm();
+    renderPractice(now); return;
+  }
+  if(wi>=practice.targets.length){ advanceRhythmNote(false); finishRhythm(); return; }
+  if(wi!==practice.rIdx){ advanceRhythmNote(false); }
+  else if(m){
+    practice.rHeldMs+=dt*1000; practice.rDevSum+=Math.abs(disp.dev); practice.rDevN++;
+  }
+  renderPractice(now);
+}
+function advanceRhythmNote(waitHit){
+  var winMs=60000/settings.bpm*practice.beatsPerNote;
+  var avgDev = practice.rDevN ? practice.rDevSum/practice.rDevN : 99;
+  var hit, score;
+  if(waitHit){ hit=true; score=Math.round(60*(1-clamp(avgDev,0,25)/25)+40); }
+  else{
+    var frac=practice.rHeldMs/winMs;
+    hit = frac>=0.5;
+    score = hit ? Math.round(60*(1-clamp(avgDev,0,25)/25) + 40*clamp(frac/0.5,0,1)) : 0;
+  }
+  practice.rResults.push(score);
+  if(hit && practice.rHeldMs>500){
+    var tg=practice.targets[practice.rIdx];
+    var k=tg.key+"|"+tg.oct;
+    stats.best[k]=Math.max(stats.best[k]||0, practice.rHeldMs/1000);
+    lsSet("bp.stats", stats);
+  }
+  if(hit){ playBlip(); flashCard("success"); }
+  else{ playTone(saFreq()/2, 0.15, 0.05); flashCard("miss"); }
+  practice.rIdx++;
+  practice.rHeldMs=0; practice.rDevSum=0; practice.rDevN=0;
+  if(practice.rIdx<practice.targets.length){ rebuildStatic(); renderSeqLine(); }
+  else finishRhythm();
+}
+function flashCard(cls){
+  var c=$("targetCard");
+  if(!c) return;
+  c.classList.add(cls);
+  setTimeout(function(){ c.classList.remove(cls); }, 450);
+}
+function finishRhythm(){
+  if(practice.done) return;
+  practice.running=false; metroStop();
+  var total=practice.rResults.reduce(function(s,v){ return s+v; }, 0);
+  var max=practice.targets.length*100;
+  var pct=max ? total/max*100 : 0;
+  practice.rScore=total; practice.rMax=max;
+  practice.rStars = pct>=90 ? 3 : (pct>=70 ? 2 : (pct>=50 ? 1 : 0));
+  var name=RHYTHMS[practice.rhythmSel].name;
+  stats.rhythm[name]=Math.max(stats.rhythm[name]||0, total);
+  stats.bonusXP.rhythm=(stats.bonusXP.rhythm||0)+Math.round(total/10);
+  lsSet("bp.stats", stats);
+  practice.done=true;
+  buildModeControls(); rebuildStatic();
+  playSuccess();
+}
+function renderRhythm(now){
+  if(!practice.running) return;
+  var big=$("targetBig");
+  if(now<practice.rStart){
+    var beatLen=60000/settings.bpm;
+    var n=Math.max(1, Math.ceil((practice.rStart-now)/beatLen));
+    big.textContent=String(n); big.className="target-big";
+    $("targetLabel").textContent="GET READY";
+    $("holdVal").textContent="0.0";
+    $("holdBarFill").style.width="0%";
+    $("practiceHint").textContent="Listen for the 4 clicks, then play along with the beat.";
+    return;
+  }
+  var tgt=currentTarget(); if(!tgt) return;
+  var m = disp.status==="note" && disp.swar.key===tgt.key && disp.oct===tgt.oct && Math.abs(disp.dev)<=25;
+  big.textContent=nameOf(tgt.key, tgt.oct);
+  big.className="target-big"+(m?" z-green":"");
+  $("targetLabel").textContent="NOW PLAY";
+  $("holdVal").textContent=(practice.rHeldMs/1000).toFixed(1);
+  var winMs=60000/settings.bpm*practice.beatsPerNote;
+  $("holdBarFill").style.width=clamp(practice.rHeldMs/(practice.waitforme?600:winMs)*100,0,100)+"%";
+  var hint=$("practiceHint");
+  if(!micOn) hint.textContent="Mic is off — tap the Mic button up top.";
+  else if(disp.status==="wait") hint.textContent="Waiting for sound…";
+  else if(disp.status==="noTone") hint.textContent="No clear tone - check your hole seal.";
+  else if(m) hint.textContent="Good — keep holding through the beat.";
+  else hint.textContent=COACH[tgt.key]||"Play the note shown above.";
+}
+function updateRhythmProgress(){
+  var sp=$("rhythmProgress"); if(!sp) return;
+  var name=RHYTHMS[practice.rhythmSel].name;
+  if(practice.running) sp.textContent="Note "+(practice.rIdx+1)+" of "+practice.targets.length;
+  else{
+    var b=stats.rhythm[name];
+    sp.textContent = b ? "Best score: "+b+" / "+(RHYTHMS[practice.rhythmSel].seq.length*100) : "";
+  }
+}
+
+/* ================= Quiz ================= */
+var QUIZ=[
+  {q:"How many holes do you close for Pa?", opts:["3","4","6"], a:2, why:"Pa needs all 6 holes closed — and hole 6 is the one your right-hand ring finger lays its flat pad across."},
+  {q:"Which finger closes hole 6?", opts:["Left-hand index finger","Right-hand ring finger","Right-hand thumb"], a:1, why:"Lay the flat pad of the right-hand ring finger across hole 6 — do not use the fingertip."},
+  {q:"Which swars never change (achal)?", opts:["Sa and Pa","Re and Dha","Ga and Ni"], a:0, why:"Sa and Pa are constant — they never get a komal or teevra form."},
+  {q:"How many komal swars are there?", opts:["2","4","5"], a:1, why:"Komal Re, Komal Ga, Komal Dha and Komal Ni — four komal swars."},
+  {q:"Teevra Ma sits between which two swars?", opts:["Ga and Ma","Ma and Pa","Pa and Dha"], a:1, why:"Teevra Ma is the sharp Ma that sits between normal Ma and Pa."},
+  {q:"Sa' (high Sa) uses the same holes as…", opts:["Pa","Ni","Sa"], a:2, why:"Same 3 holes as Sa — just blow a little harder for the higher note."},
+  {q:"With softer air, the same fingering sounds…", opts:["One octave lower (Mandra)","One octave higher","Exactly the same"], a:0, why:"Soft air → Mandra (low). Stronger air → Madhya (middle). That is how low Pa works."},
+  {q:"How many holes do you close for Dha?", opts:["4","5","6"], a:1, why:"Dha: holes 1 to 5 closed, hole 6 open."},
+  {q:"Komal Ni needs one half-closed hole. Which one?", opts:["Hole 3","Hole 5","Hole 6"], a:1, why:"Komal Ni: holes 1–4 closed, hole 5 half-closed, hole 6 open."},
+  {q:"What does the app count as 'In tune'?", opts:["Within 15 cents","Within 50 cents","Any clear sound"], a:0, why:"Within 15 cents of the target shows green 'In tune'."}
+];
+var quiz={run:false, order:[], i:0, correct:0};
+function shuffleArr(a){
+  for(var i=a.length-1;i>0;i--){ var j=Math.floor(Math.random()*(i+1)); var t=a[i]; a[i]=a[j]; a[j]=t; }
+  return a;
+}
+function startQuiz(){
+  quiz.run=true;
+  quiz.order=shuffleArr(QUIZ.map(function(q,i){ return i; }));
+  quiz.i=0; quiz.correct=0;
+  renderQuiz();
+}
+function renderQuiz(){
+  var host=$("quizCard"); if(!host) return;
+  if(!quiz.run){
+    host.innerHTML='<div style="font-weight:800; font-size:19px; margin-bottom:4px">Quick questions, real learning</div>'+
+      '<div class="small dim" style="margin-bottom:10px">10 questions about swars, fingers and air.</div>'+
+      (stats.quizBest ? '<div class="small dim" style="margin-bottom:10px">Best score: '+stats.quizBest+'/10</div>' : '')+
+      '<button class="btn btn-primary" id="quizStart" type="button">Start quiz</button>';
+    $("quizStart").addEventListener("click", startQuiz);
+    return;
+  }
+  if(quiz.i>=quiz.order.length){
+    quiz.run=false;
+    stats.quizBest=Math.max(stats.quizBest, quiz.correct);
+    stats.bonusXP.quiz=(stats.bonusXP.quiz||0)+quiz.correct*10;
+    lsSet("bp.stats", stats);
+    var msg = quiz.correct>=8 ? "Excellent — your head knows the flute as well as your hands." :
+              quiz.correct>=5 ? "Good. Open the Learn cards once more, then come back." :
+              "No worry at all — open Learn, tap a few swars, then try again.";
+    host.innerHTML='<div style="font-weight:800; font-size:22px">'+quiz.correct+' / '+quiz.order.length+' correct</div>'+
+      '<div class="dim" style="margin:6px 0 10px">'+msg+'</div>'+
+      '<div class="small dim" style="margin-bottom:10px">+'+(quiz.correct*10)+' XP added · Best: '+stats.quizBest+'/10</div>'+
+      '<button class="btn btn-primary" id="quizAgain" type="button">Try again</button>';
+    $("quizAgain").addEventListener("click", startQuiz);
+    return;
+  }
+  var q=QUIZ[quiz.order[quiz.i]];
+  var html='<div class="small dim" style="margin-bottom:6px">Question '+(quiz.i+1)+' of '+quiz.order.length+' · '+quiz.correct+' correct so far</div>'+
+    '<div style="font-size:19px; font-weight:800; margin-bottom:12px">'+q.q+'</div>'+
+    q.opts.map(function(o,i){ return '<button class="quiz-opt" data-qi="'+i+'" type="button">'+o+'</button>'; }).join("")+
+    '<div id="quizWhy" class="hint" style="display:none"></div>'+
+    '<button class="btn btn-primary" id="quizNext" type="button" style="margin-top:10px; display:none">Next</button>';
+  host.innerHTML=html;
+  Array.prototype.forEach.call(host.querySelectorAll(".quiz-opt"), function(b){
+    b.addEventListener("click", function(){
+      if(b.disabled) return;
+      var pick=+b.getAttribute("data-qi");
+      var ok = pick===q.a;
+      if(ok) quiz.correct++;
+      Array.prototype.forEach.call(host.querySelectorAll(".quiz-opt"), function(x){ x.disabled=true; });
+      b.classList.add(ok?"correct":"wrong");
+      host.querySelectorAll(".quiz-opt")[q.a].classList.add("correct");
+      var w=$("quizWhy");
+      w.textContent=(ok?"Right! ":"Not quite. ")+q.why;
+      w.style.display="block";
+      $("quizNext").style.display="inline-block";
+    });
+  });
+  $("quizNext").addEventListener("click", function(){ quiz.i++; renderQuiz(); });
+}
+
+/* ================= Levels & XP ================= */
+var LEVELS=[[0,"First sounds"],[300,"Sa–Pa steady"],[900,"Alankar ready"],[1800,"Sargam flowing"],[3000,"Rhythm ready"],[4500,"Flute friend"]];
+function totalSecondsAll(){ var s=0; for(var k in stats.days) s+=stats.days[k].sec||0; return s; }
+function totalXP(){ return Math.round(totalSecondsAll())+(stats.bonusXP.quiz||0)+(stats.bonusXP.rhythm||0); }
+function levelFor(xp){ var li=0; for(var i=0;i<LEVELS.length;i++) if(xp>=LEVELS[i][0]) li=i; return li; }
+
 /* ================= progress render ================= */
 function renderProgress(){
+  var xp=totalXP(), li=levelFor(xp);
+  $("lvlNum").textContent=String(li+1);
+  $("lvlName").textContent=LEVELS[li][1];
+  var cur=LEVELS[li][0], nextT = li+1<LEVELS.length ? LEVELS[li+1][0] : null;
+  if(nextT!=null){
+    $("xpFill").style.width=clamp((xp-cur)/(nextT-cur)*100,0,100)+"%";
+    $("xpLine").textContent=xp+" XP · "+(nextT-xp)+" XP to “"+LEVELS[li+1][1]+"”";
+  }else{
+    $("xpFill").style.width="100%";
+    $("xpLine").textContent=xp+" XP · top level!";
+  }
+  var rb=$("rhythmBests");
+  if(rb){
+    rb.innerHTML="";
+    RHYTHMS.forEach(function(r){
+      var best=stats.rhythm[r.name]||0, mx=r.seq.length*100;
+      var row=el("div","prow");
+      var nm=el("span","pname", r.name); nm.style.width="auto"; nm.style.minWidth="110px";
+      row.appendChild(nm);
+      var pb=el("div","pbar"); var fill=el("div");
+      fill.style.width=(best? clamp(best/mx*100,0,100) : 0)+"%";
+      fill.className = best>=mx*0.7 ? "" : (best>0 ? "yellow" : "none");
+      pb.appendChild(fill); row.appendChild(pb);
+      row.appendChild(el("span","pval", best ? (best+"/"+mx) : "—"));
+      rb.appendChild(row);
+    });
+  }
   var pa=swarAcc7("Pa");
   var bar=$("paAccBar"), val=$("paAccVal");
   if(pa.t>0.5){
@@ -1600,7 +1997,7 @@ function renderProgress(){
 $("clearBtn").addEventListener("click", function(){
   if(confirm("This deletes all your saved progress, best holds and Sa settings. Are you sure?")){
     lsDel("bp.stats"); lsDel("bp.profiles"); lsDel("bp.active"); lsDel("bp.settings");
-    stats={days:{}, best:{}};
+    stats={days:{}, best:{}, rhythm:{}, quizBest:0, bonusXP:{quiz:0, rhythm:0}};
     profiles={ pvc:{saFreq:523.25, saNote:"C"}, wood:{saFreq:523.25, saNote:"C"} };
     activeProfile="pvc";
     settings={bpm:60, droneVol:35, goal:3};
@@ -1637,8 +2034,10 @@ Array.prototype.forEach.call(document.querySelectorAll(".tab"), function(b){
     $("sec-listen").hidden = currentTab!=="listen";
     $("sec-learn").hidden = currentTab!=="learn";
     $("sec-practice").hidden = currentTab!=="practice";
+    $("sec-quiz").hidden = currentTab!=="quiz";
     $("sec-progress").hidden = currentTab!=="progress";
     if(currentTab==="listen") sizeGraph();
+    if(currentTab==="quiz") renderQuiz();
     if(currentTab==="progress") renderProgress();
   });
 });
