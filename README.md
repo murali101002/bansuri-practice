@@ -18,7 +18,7 @@ Built for a C bansuri beginner, with a focus on the classic Pa problem (sealing 
 
 - **Listen (tuner):** autocorrelation pitch detection (McLeod/MPM) tuned for breathy flute tone, median-filtered, 290–1150 Hz, cents meter with plain words, stability bar, 5-second pitch graph, and plain-language leak hints ("Pitch is jumping Pa to Dha. Check hole 6.")
 - **Learn:** fingering chart for all 12 swars + Sa', half-hole diagrams for komal/teevra swars, reference tones, hole-6 coaching on Pa
-- **Practice:** Target Swar (Pa only / Sa–Pa–Sa–Pa / any swar), Mandra practice (low Pa, Dha, Ni with hold goals 3/5/8/10 s), Sargam trainer with metronome (40–120 BPM)
+- **Practice:** Target Swar (Pa only / Sa–Pa–Sa–Pa / **Random test** across all swars, with optional low-note pool / any single swar), Mandra practice (low Pa, Dha, Ni with hold goals 3/5/8/10 s), Sargam trainer with metronome (40–120 BPM)
 - **Listen first:** every sequence can be demonstrated at your tempo with note highlighting before you play it
 - **Rhythm game:** play along with the visual beat — 5 patterns, per-note pitch + timing score, stars, best scores saved. "Follows the beat" or "Waits for me" mode
 - **Quiz:** 10 plain-language questions on swars, fingering and air; every correct answer earns XP

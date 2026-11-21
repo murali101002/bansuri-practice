@@ -1287,6 +1287,7 @@ var practice={
   rhythmSel:0, beatsPerNote:2, waitforme:false,
   rIdx:0, rHeldMs:0, rDevSum:0, rDevN:0, rResults:[], rScore:0, rMax:0, rStars:0,
   rStart:0, countStart:0,
+  randomPassed:0, randomLow:true,
   lastT:0
 };
 function nameOf(key, oct){
@@ -1298,7 +1299,26 @@ function offOf(key){
   return s.off;
 }
 function targetFreq(t){ return saFreq()*Math.pow(2, (targetCents(offOf(t.key)) + t.oct*1200)/1200); }
+function randomPool(){
+  var pool=SWARS.map(function(s){ return {key:s.key, oct:0}; });
+  pool.push({key:"Sa", oct:1});   /* Sa' */
+  if(practice.randomLow){
+    pool.push({key:"Pa", oct:-1}, {key:"Dha", oct:-1}, {key:"Ni", oct:-1});
+  }
+  return pool;
+}
+function pickRandomTarget(prevT){
+  var pool=randomPool();
+  var prev = prevT ? (prevT.key+"|"+prevT.oct) : null;
+  var t=null, guard=0;
+  do{
+    t=pool[Math.floor(Math.random()*pool.length)];
+    guard++;
+  }while(prev && (t.key+"|"+t.oct)===prev && guard<20);
+  return {key:t.key, oct:t.oct};
+}
 function buildTargetSeq(){
+  if(practice.loop==="random") return [pickRandomTarget(practice.targets[0]||null)];
   if(practice.loop==="pa") return [{key:"Pa", oct:practice.targetOct}];
   if(practice.loop==="sapa") return [{key:"Sa",oct:0},{key:"Pa",oct:0},{key:"Sa",oct:0},{key:"Pa",oct:0}];
   var oct=0;
@@ -1319,6 +1339,7 @@ function enterMode(mode){
   practice.mode=mode;
   practice.hold=0; practice.lastT=performance.now();
   if(mode==="target"){
+    practice.randomPassed=0;
     practice.targets=buildTargetSeq(); practice.idx=0;
   }
   if(mode==="mandra"){ practice.mIdx=0; }
@@ -1338,6 +1359,7 @@ function exitMode(){
   relWake();
 }
 function resetTargets(){
+  practice.randomPassed=0;
   practice.targets=buildTargetSeq();
   practice.idx=0; practice.hold=0;
   buildModeControls(); rebuildStatic();
@@ -1354,9 +1376,14 @@ function buildModeControls(){
       '<div class="chip-row">'+
         '<button class="chip'+(practice.loop==="pa"?" active":"")+'" data-act="loop" data-loop="pa">Pa only</button>'+
         '<button class="chip'+(practice.loop==="sapa"?" active":"")+'" data-act="loop" data-loop="sapa">Sa–Pa–Sa–Pa</button>'+
+        '<button class="chip'+(practice.loop==="random"?" active":"")+'" data-act="loop" data-loop="random">Random test</button>'+
         '<button class="chip'+(practice.loop==="single"?" active":"")+'" data-act="pick">Choose a swar</button>'+
       '</div>'+
-      (octChipsNeeded() ?
+      (practice.loop==="random" ?
+        '<div class="chip-row"><span class="dim octave-label">Test pool:</span>'+
+        '<button class="chip'+(practice.randomLow?" active":"")+'" data-act="rlow" data-v="1">With low notes</button>'+
+        '<button class="chip'+(!practice.randomLow?" active":"")+'" data-act="rlow" data-v="0">Middle only</button></div>' :
+        octChipsNeeded() ?
         '<div class="chip-row"><span class="dim octave-label">Octave:</span>'+
         '<button class="chip'+(practice.targetOct===-1?" active":"")+'" data-act="oct" data-oct="-1">Mandra (low)</button>'+
         '<button class="chip'+(practice.targetOct===0?" active":"")+'" data-act="oct" data-oct="0">Madhya (middle)</button></div>' : "")+
@@ -1463,6 +1490,10 @@ function renderSeqLine(){
     }).join(' <span class="dim">·</span> ');
     return;
   }
+  if(practice.loop==="random"){
+    host.textContent="Random test — passed "+practice.randomPassed+". A new swar after every lock.";
+    return;
+  }
   if(practice.loop==="sapa"){
     var names=practice.targets.map(function(t){ return nameOf(t.key,t.oct); });
     host.innerHTML=names.map(function(n,i){
@@ -1554,7 +1585,7 @@ function rebuildStatic(){
     return;
   }
   var s=SWARS.find(function(w){ return w.key===tgt.key; });
-  $("targetLabel").textContent="NOW PLAY";
+  $("targetLabel").textContent="NOW PLAY"+(tgt.oct<0?" · LOW":"");
   $("targetBig").textContent=nameOf(tgt.key, tgt.oct);
   $("targetNote").textContent=s.west+" · "+octName(tgt.oct)+" · "+fmtHz(targetFreq(tgt));
   $("holdGoal").textContent =
@@ -1596,7 +1627,12 @@ function practiceTick(now){
     practice.hold+=dt;
     if(practice.mode==="target" && practice.hold>=2){
       succeed(false); endHold();
-      practice.idx=(practice.idx+1)%practice.targets.length;
+      if(practice.loop==="random"){
+        practice.randomPassed++;
+        practice.targets=[pickRandomTarget(practice.targets[0])];
+      }else{
+        practice.idx=(practice.idx+1)%practice.targets.length;
+      }
       rebuildStatic();
     }else if(practice.mode==="mandra" && practice.hold>=practice.goal){
       succeed(false); endHold();
