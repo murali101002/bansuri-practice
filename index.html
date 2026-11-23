@@ -1287,7 +1287,7 @@ var practice={
   rhythmSel:0, beatsPerNote:2, waitforme:false,
   rIdx:0, rHeldMs:0, rDevSum:0, rDevN:0, rResults:[], rScore:0, rMax:0, rStars:0,
   rStart:0, countStart:0,
-  randomPassed:0, randomLow:true,
+  randomPassed:0, randomLow:true, poolType:"all",
   lastT:0
 };
 function nameOf(key, oct){
@@ -1300,9 +1300,19 @@ function offOf(key){
 }
 function targetFreq(t){ return saFreq()*Math.pow(2, (targetCents(offOf(t.key)) + t.oct*1200)/1200); }
 function randomPool(){
-  var pool=SWARS.map(function(s){ return {key:s.key, oct:0}; });
-  pool.push({key:"Sa", oct:1});   /* Sa' */
-  if(practice.randomLow){
+  var pool;
+  if(practice.poolType==="shudh"){
+    pool = SWARS.filter(function(s){ return ["Sa","Re","Ga","Ma","Pa","Dha","Ni"].indexOf(s.key)>=0; })
+               .map(function(s){ return {key:s.key, oct:0}; });
+    pool.push({key:"Sa", oct:1});   /* Sa' */
+  }else if(practice.poolType==="komal"){
+    pool = SWARS.filter(function(s){ return ["kRe","kGa","kDha","kNi","tMa"].indexOf(s.key)>=0; })
+               .map(function(s){ return {key:s.key, oct:0}; });
+  }else{
+    pool = SWARS.map(function(s){ return {key:s.key, oct:0}; });
+    pool.push({key:"Sa", oct:1});   /* Sa' */
+  }
+  if(practice.randomLow && practice.poolType!=="komal"){
     pool.push({key:"Pa", oct:-1}, {key:"Dha", oct:-1}, {key:"Ni", oct:-1});
   }
   return pool;
@@ -1380,9 +1390,14 @@ function buildModeControls(){
         '<button class="chip'+(practice.loop==="single"?" active":"")+'" data-act="pick">Choose a swar</button>'+
       '</div>'+
       (practice.loop==="random" ?
-        '<div class="chip-row"><span class="dim octave-label">Test pool:</span>'+
-        '<button class="chip'+(practice.randomLow?" active":"")+'" data-act="rlow" data-v="1">With low notes</button>'+
-        '<button class="chip'+(!practice.randomLow?" active":"")+'" data-act="rlow" data-v="0">Middle only</button></div>' :
+        '<div class="chip-row"><span class="dim octave-label">Swar type:</span>'+
+        '<button class="chip'+(practice.poolType==="shudh"?" active":"")+'" data-act="ptype" data-pt="shudh">Shudh swars</button>'+
+        '<button class="chip'+(practice.poolType==="komal"?" active":"")+'" data-act="ptype" data-pt="komal">Komal + Teevra</button>'+
+        '<button class="chip'+(practice.poolType==="all"?" active":"")+'" data-act="ptype" data-pt="all">All swars</button></div>'+
+        (practice.poolType!=="komal" ?
+          '<div class="chip-row"><span class="dim octave-label">Low notes:</span>'+
+          '<button class="chip'+(practice.randomLow?" active":"")+'" data-act="rlow" data-v="1">With low notes</button>'+
+          '<button class="chip'+(!practice.randomLow?" active":"")+'" data-act="rlow" data-v="0">Middle only</button></div>' : "") :
         octChipsNeeded() ?
         '<div class="chip-row"><span class="dim octave-label">Octave:</span>'+
         '<button class="chip'+(practice.targetOct===-1?" active":"")+'" data-act="oct" data-oct="-1">Mandra (low)</button>'+
@@ -1453,6 +1468,8 @@ $("modeControls").addEventListener("click", function(e){
   var b=e.target.closest("[data-act]"); if(!b) return;
   var act=b.getAttribute("data-act");
   if(act==="loop"){ practice.loop=b.getAttribute("data-loop"); resetTargets(); }
+  else if(act==="rlow"){ practice.randomLow=b.getAttribute("data-v")==="1"; resetTargets(); }
+  else if(act==="ptype"){ practice.poolType=b.getAttribute("data-pt"); resetTargets(); }
   else if(act==="oct"){ practice.targetOct=+b.getAttribute("data-oct"); resetTargets(); }
   else if(act==="pick"){ openPick(); }
   else if(act==="mnote"){ practice.mIdx=+b.getAttribute("data-mi"); practice.hold=0; buildModeControls(); rebuildStatic(); }
